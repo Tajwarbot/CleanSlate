@@ -6,6 +6,7 @@
  */
 
 import { MessageType, type ExtensionMessage } from '../types/messages';
+import type { ActivityCategory } from '../types/common';
 import { validateIncomingMessage, isAuthorizedMessage } from '../utils/validation';
 import { logger } from '../core/logging/logger';
 
@@ -70,20 +71,21 @@ function routeMessage(
       break;
 
     case MessageType.GetSettings:
-      // Settings will be loaded from storage in Phase 2+
       sendResponse({ settings: {} });
       break;
 
     case MessageType.DetectCapabilities:
-      sendResponse({ capabilities: [] });
+      handleDetectCapabilities(sendResponse);
       break;
 
     case MessageType.StartScan:
+      handleStartScan(message as ExtensionMessage & { category?: ActivityCategory; dryRun?: boolean }, sendResponse);
+      break;
+
     case MessageType.StartOperation:
     case MessageType.PauseOperation:
     case MessageType.ResumeOperation:
     case MessageType.StopOperation:
-      // These will be fully implemented in Phase 3+
       sendResponse({ acknowledged: true });
       break;
 
@@ -97,6 +99,107 @@ function routeMessage(
 
     default:
       sendResponse({ error: 'Unhandled message type' });
+  }
+}
+
+async function handleDetectCapabilities(sendResponse: (response: unknown) => void) {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+
+    if (!activeTab || !activeTab.id || !activeTab.url) {
+      sendResponse({ capabilities: [], platform: 'unknown' });
+      return;
+    }
+
+    try {
+      const response = await chrome.tabs.sendMessage(activeTab.id, {
+        type: 'DETECT_CAPABILITIES',
+      }) as { platform: string; capabilities: unknown[] };
+
+      if (response) {
+        sendResponse({ capabilities: response.capabilities || [], platform: response.platform || 'unknown' });
+        return;
+      }
+    } catch {
+      // Content script not ready
+    }
+
+    const isFb = activeTab.url.includes('facebook.com');
+    const isMsger = activeTab.url.includes('messenger.com');
+    sendResponse({
+      capabilities: [],
+      platform: isFb ? 'facebook' : isMsger ? 'messenger' : 'unknown',
+    });
+  } catch {
+    sendResponse({ capabilities: [], platform: 'unknown' });
+  }
+}
+
+async function handleStartScan(
+  message: ExtensionMessage & { category?: ActivityCategory; dryRun?: boolean },
+  sendResponse: (response: unknown) => void,
+) {
+  const category = message.category || 'comments';
+
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+
+    if (!activeTab || !activeTab.id || !activeTab.url) {
+      sendResponse({ items: [], error: 'No active tab found' });
+      return;
+    }
+
+    const isFb = activeTab.url.includes('facebook.com');
+    const isMsger = activeTab.url.includes('messenger.com');
+
+    if (!isFb && !isMsger) {
+      sendResponse({
+        items: [],
+        error: 'Please open Facebook or Messenger in your browser tab before starting a scan.',
+      });
+      return;
+    }
+
+    let response: { status: string; items: unknown[]; error?: string } | null = null;
+
+    try {
+      response = (await chrome.tabs.sendMessage(activeTab.id, {
+        type: 'SCAN_REQUEST',
+        category,
+        dryRun: message.dryRun,
+      })) as { status: string; items: unknown[]; error?: string };
+    } catch {
+      // Content script not injected yet, try injecting script
+      try {
+        await chrome.scripting.executeScript({
+          target: { tabId: activeTab.id },
+          files: ['content/content-script.js'],
+        });
+
+        response = (await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'SCAN_REQUEST',
+          category,
+          dryRun: message.dryRun,
+        })) as { status: string; items: unknown[]; error?: string };
+      } catch {
+        // Injection error
+      }
+    }
+
+    const items = response?.items || [];
+    sendResponse({
+      items,
+      preview: {
+        category,
+        totalItems: items.length,
+        items,
+        generatedAt: Date.now(),
+      },
+    });
+  } catch (err) {
+    sendResponse({ items: [], error: err instanceof Error ? err.message : 'Scan request failed' });
   }
 }
 

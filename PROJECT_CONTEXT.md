@@ -25,21 +25,30 @@
 | **Operation Controller** | `src/core/controller/operation-controller.ts` | ✅ Complete | Manages scans, previews, dry-runs, batch execution, report generation |
 | **Scheduler** | `src/core/scheduler/scheduler.ts` | ✅ Complete | Human-like random delay batch scheduler with pause/resume/stop |
 | **Storage Layer** | `src/storage/` | ✅ Complete | Settings persistence & session state recovery after browser reload |
-| **Service Worker** | `src/background/service-worker.ts` | ✅ Complete | Strongly-typed message router between popup and content scripts |
+| **Service Worker** | `src/background/service-worker.ts` | ✅ Complete | Live message router connecting popup UI to active tab content script |
 | **React Popup UI** | `src/ui/popup/` | ✅ Complete | 8 Page Views, 7 Shared Components, custom hook, CSS design system |
-| **Build & Package** | `vite.config.ts`, `scripts/` | ✅ Complete | Vite pipeline, PNG icon generator, zip package, multi-browser launcher |
+| **Build & Launcher** | `vite.config.ts`, `scripts/launch.mjs` | ✅ Complete | Interactive browser & profile selector CLI installer |
 | **Facebook DOM Adapter** | `src/adapters/facebook-adapter.ts` | ✅ Complete | Live DOM activity scanning, action execution, modal confirmation, verification |
 | **Messenger DOM Adapter** | `src/adapters/messenger-adapter.ts` | ✅ Complete | Live conversation discovery, chat deletion, confirmation handling, verification |
 | **Content Script Wiring** | `src/content/index.ts` | ✅ Complete | Injected script connecting DOM adapters to Service Worker messaging |
 
 ---
 
-## 🚀 Direct 1-Click Installation & Launch
+## 🚀 Interactive Multi-Browser & Multi-Profile Installation
 
-### Option 1: Double-Click `install.bat` (Windows)
-Double-clicking `install.bat` runs `scripts/install-direct.ps1`, which automatically builds CleanSlate and launches Brave / Chrome / Edge with the extension pre-installed.
-
-### Option 2: Terminal One-Liner
+### Launching the Installer
+Run either of the following commands:
 ```powershell
+# Option 1: Double-click install.bat
+install.bat
+
+# Option 2: Terminal command
 npm start
 ```
+
+### Installer Capabilities
+- **Browser Auto-Discovery**: Detects installed Chromium browsers (Brave, Google Chrome, Microsoft Edge, Opera, Vivaldi).
+- **Profile Discovery**: Scans and lists user profiles (e.g. `Personal`, `Ahmad Taki Tajwar`, `Work`, `Default`).
+- **Mode Options**:
+  1. **Permanent Install**: Copies `dist` folder path to Windows Clipboard (`Ctrl+V`), opens File Explorer, and opens the chosen browser extensions page (`brave://extensions`, `chrome://extensions`).
+  2. **Isolated Dev Window**: Launches a clean temporary profile pre-loaded with CleanSlate for testing.

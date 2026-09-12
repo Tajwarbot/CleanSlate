@@ -1,4 +1,4 @@
-import { existsSync } from 'fs';
+import { existsSync, readdirSync, readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { exec, execSync } from 'child_process';
@@ -11,137 +11,236 @@ const root = resolve(__dirname, '..');
 const dist = resolve(root, 'dist');
 const devProfile = resolve(root, '.cleanslate-profile');
 
-// Ensure extension is built
-if (!existsSync(resolve(dist, 'manifest.json'))) {
-  console.log('Building CleanSlate extension...');
-  execSync('npm run build', { cwd: root, stdio: 'inherit' });
-}
-
-// Ensure zip package is generated
-try {
-  execSync('npm run package', { cwd: root, stdio: 'ignore' });
-} catch {
-  // Ignore zip failure if non-critical
-}
-
 const localAppData = process.env.LOCALAPPDATA || resolve(os.homedir(), 'AppData/Local');
 const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
 const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
 
-const browsers = [
+const browserConfigs = [
   {
     id: 'brave',
     name: 'Brave Browser',
-    exe: [
+    exePaths: [
       resolve(programFiles, 'BraveSoftware/Brave-Browser/Application/brave.exe'),
       resolve(programFilesX86, 'BraveSoftware/Brave-Browser/Application/brave.exe'),
       resolve(localAppData, 'BraveSoftware/Brave-Browser/Application/brave.exe'),
-    ].find(existsSync) || '',
+    ],
+    userDataDir: resolve(localAppData, 'BraveSoftware/Brave-Browser/User Data'),
     extUrl: 'brave://extensions',
   },
   {
     id: 'chrome',
     name: 'Google Chrome',
-    exe: [
+    exePaths: [
       resolve(programFiles, 'Google/Chrome/Application/chrome.exe'),
       resolve(programFilesX86, 'Google/Chrome/Application/chrome.exe'),
       resolve(localAppData, 'Google/Chrome/Application/chrome.exe'),
-    ].find(existsSync) || '',
+    ],
+    userDataDir: resolve(localAppData, 'Google/Chrome/User Data'),
     extUrl: 'chrome://extensions',
   },
   {
     id: 'edge',
     name: 'Microsoft Edge',
-    exe: [
+    exePaths: [
       resolve(programFilesX86, 'Microsoft/Edge/Application/msedge.exe'),
       resolve(programFiles, 'Microsoft/Edge/Application/msedge.exe'),
       resolve(localAppData, 'Microsoft/Edge/Application/msedge.exe'),
-    ].find(existsSync) || '',
+    ],
+    userDataDir: resolve(localAppData, 'Microsoft/Edge/User Data'),
     extUrl: 'edge://extensions',
   },
-].filter((b) => Boolean(b.exe));
+  {
+    id: 'opera',
+    name: 'Opera',
+    exePaths: [
+      resolve(localAppData, 'Programs/Opera/opera.exe'),
+      resolve(programFiles, 'Opera/opera.exe'),
+      resolve(programFilesX86, 'Opera/opera.exe'),
+    ],
+    userDataDir: resolve(localAppData, 'Opera Software/Opera Stable'),
+    extUrl: 'opera://extensions',
+  },
+  {
+    id: 'vivaldi',
+    name: 'Vivaldi',
+    exePaths: [
+      resolve(localAppData, 'Vivaldi/Application/vivaldi.exe'),
+      resolve(programFiles, 'Vivaldi/Application/vivaldi.exe'),
+    ],
+    userDataDir: resolve(localAppData, 'Vivaldi/User Data'),
+    extUrl: 'vivaldi://extensions',
+  },
+];
 
 console.log('\n====================================================');
 console.log('   🧼 CleanSlate Extension Installation Helper');
 console.log('====================================================\n');
+
+// Step 1: Ensure extension is built
+if (!existsSync(resolve(dist, 'manifest.json'))) {
+  console.log('📦 Building CleanSlate extension...');
+  try {
+    execSync('npm run build', { cwd: root, stdio: 'inherit' });
+  } catch (err) {
+    console.error('❌ Build failed. Please fix build errors before installing.');
+    process.exit(1);
+  }
+} else {
+  console.log('⚡ CleanSlate extension bundle found in "dist" directory.');
+}
+
+const installedBrowsers = browserConfigs
+  .map((b) => ({
+    ...b,
+    exe: b.exePaths.find(existsSync) || '',
+  }))
+  .filter((b) => Boolean(b.exe));
+
+function getProfilesForBrowser(userDataDir) {
+  const profiles = [];
+  if (!userDataDir || !existsSync(userDataDir)) return profiles;
+
+  try {
+    const entries = readdirSync(userDataDir, { withFileTypes: true });
+    for (const entry of entries) {
+      if (!entry.isDirectory()) continue;
+      if (entry.name === 'System Profile' || entry.name === 'Guest Profile') continue;
+
+      const prefPath = resolve(userDataDir, entry.name, 'Preferences');
+      if (existsSync(prefPath)) {
+        let name = entry.name;
+        try {
+          const pref = JSON.parse(readFileSync(prefPath, 'utf-8'));
+          if (pref.profile && pref.profile.name) {
+            name = pref.profile.name;
+          }
+        } catch {
+          // ignore parsing error
+        }
+        profiles.push({
+          dirName: entry.name,
+          displayName: name === entry.name ? entry.name : `${name} (${entry.name})`,
+        });
+      }
+    }
+  } catch {
+    // ignore readdir error
+  }
+  return profiles;
+}
 
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout,
 });
 
-function promptUser() {
-  if (browsers.length === 0) {
-    console.log('No supported browsers found automatically.');
-    openExtensionsPage('chrome://extensions');
+function ask(query) {
+  return new Promise((res) => rl.question(query, res));
+}
+
+async function main() {
+  if (installedBrowsers.length === 0) {
+    console.log('\n❌ No supported Chromium browsers detected automatically.');
+    openExtensionsPage('chrome://extensions', null, null);
     rl.close();
     return;
   }
 
-  console.log('Detected installed browsers:');
-  browsers.forEach((b, index) => {
+  console.log('\nDetected installed browsers:');
+  installedBrowsers.forEach((b, index) => {
     console.log(`  [${index + 1}] ${b.name}`);
   });
 
-  rl.question(`\nSelect browser (1-${browsers.length}) [Default: 1]: `, (answer) => {
-    const choiceIdx = parseInt(answer.trim() || '1', 10) - 1;
-    const selected = browsers[choiceIdx] || browsers[0];
+  const browserAns = await ask(`\nSelect browser (1-${installedBrowsers.length}) [Default: 1]: `);
+  const browserIdx = parseInt(browserAns.trim() || '1', 10) - 1;
+  const selectedBrowser = installedBrowsers[browserIdx] || installedBrowsers[0];
 
-    console.log(`\nHow would you like to install CleanSlate into ${selected.name}?`);
-    console.log('  [1] Permanent Install (Opens extensions page + copies folder path to Ctrl+V)');
-    console.log('  [2] Direct Launch Window (Starts browser instance with extension pre-loaded)');
+  const profiles = getProfilesForBrowser(selectedBrowser.userDataDir);
 
-    rl.question('\nSelect mode (1 or 2) [Default: 1]: ', (modeAns) => {
-      const mode = modeAns.trim() || '1';
-      if (mode === '2') {
-        launchDirectDevWindow(selected);
-      } else {
-        openExtensionsPage(selected.extUrl, selected);
-      }
-      rl.close();
+  let selectedProfile = null;
+  if (profiles.length > 0) {
+    console.log(`\nDetected profiles for ${selectedBrowser.name}:`);
+    profiles.forEach((p, index) => {
+      console.log(`  [${index + 1}] ${p.displayName}`);
     });
-  });
+    console.log(`  [${profiles.length + 1}] Choose profile inside browser window`);
+
+    const profileAns = await ask(`\nSelect profile (1-${profiles.length + 1}) [Default: 1]: `);
+    const profileIdx = parseInt(profileAns.trim() || '1', 10) - 1;
+    if (profileIdx >= 0 && profileIdx < profiles.length) {
+      selectedProfile = profiles[profileIdx];
+    }
+  }
+
+  console.log(`\nHow would you like to install CleanSlate into ${selectedBrowser.name}?`);
+  console.log('  [1] Permanent Install (Opens extensions page + copies folder path to Ctrl+V)');
+  console.log('  [2] Isolated Dev Session (Starts clean browser profile pre-loaded for testing)');
+
+  const modeAns = await ask('\nSelect mode (1 or 2) [Default: 1]: ');
+  const mode = modeAns.trim() || '1';
+
+  if (mode === '2') {
+    launchIsolatedDevWindow(selectedBrowser);
+  } else {
+    openExtensionsPage(selectedBrowser.extUrl, selectedBrowser, selectedProfile);
+  }
+
+  rl.close();
 }
 
-function launchDirectDevWindow(browser) {
-  console.log(`\n🚀 Launching ${browser.name} with CleanSlate pre-loaded...`);
+function launchIsolatedDevWindow(browser) {
+  console.log(`\n🚀 Launching isolated session in ${browser.name}...`);
   const cmd = `"${browser.exe}" --user-data-dir="${devProfile}" --disable-extensions-except="${dist}" --load-extension="${dist}" "${browser.extUrl}"`;
   exec(cmd);
-  console.log('Browser launched successfully into extensions page!');
+  console.log('✅ Isolated browser window launched with CleanSlate pre-loaded!');
 }
 
-function openExtensionsPage(extUrl, browser) {
+function openExtensionsPage(extUrl, browser, profile) {
   try {
     const psCmd = `pwsh -Command "Set-Clipboard -Value '${dist}'"`;
     execSync(psCmd, { stdio: 'ignore' });
     console.log(`\n📋 CleanSlate folder path copied to your clipboard:`);
-    console.log(`   ${dist}\n`);
+    console.log(`   ${dist}`);
   } catch {
     try {
       execSync(`echo ${dist}| clip`, { stdio: 'ignore' });
     } catch {
-      // Ignore fallback
+      // Ignore clip fallback failure
     }
   }
 
-  console.log(`📂 Opening "dist" folder in File Explorer...`);
-  exec(`explorer "${dist}"`);
+  console.log(`\n📂 Opening "dist" folder in File Explorer...`);
+  try {
+    exec(`explorer "${dist}"`);
+  } catch {
+    // Ignore explorer launch error
+  }
 
-  console.log(`🌐 Opening ${extUrl} in your browser...`);
+  const profileFlag = profile ? `--profile-directory="${profile.dirName}"` : '';
+  const profileNameStr = profile ? profile.displayName : 'Selected Browser';
+
+  console.log(`\n🌐 Opening ${browser ? browser.name : 'browser'} extensions page (${profileNameStr})...`);
+
+  const args = [];
+  if (profileFlag) args.push(profileFlag);
+  args.push(`--load-extension="${dist}"`);
+  args.push(`"${extUrl}"`);
+
   if (browser && browser.exe) {
-    exec(`"${browser.exe}" "${extUrl}"`);
+    const launchCmd = `"${browser.exe}" ${args.join(' ')}`;
+    exec(launchCmd);
   } else {
     exec(`start ${extUrl}`);
   }
 
   console.log('\n====================================================');
-  console.log('   ⚡ 3-STEP INSTALLATION:');
+  console.log('   ⚡ 3-STEP PERMANENT INSTALLATION:');
   console.log('====================================================');
   console.log(' 1️⃣  Toggle "Developer mode" ON (top-right of extensions page)');
   console.log(' 2️⃣  Click "Load unpacked" (top-left button)');
   console.log(' 3️⃣  Press Ctrl+V to paste path & click "Select Folder"');
-  console.log('====================================================\n');
-  console.log('CleanSlate will now remain installed permanently in your browser toolbar!');
+  console.log('====================================================');
+  console.log('CleanSlate will remain permanently installed in your browser toolbar!\n');
 }
 
-promptUser();
+main();

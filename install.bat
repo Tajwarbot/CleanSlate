@@ -1,7 +1,7 @@
 @echo off
-title CleanSlate Extension Launcher
+title CleanSlate Extension Installer
 cls
-powershell -ExecutionPolicy Bypass -File "%~dp0scripts\install-direct.ps1"
+node "%~dp0scripts\launch.mjs"
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo Press any key to exit.
