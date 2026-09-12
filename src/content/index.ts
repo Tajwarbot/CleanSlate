@@ -98,11 +98,32 @@ async function waitForActivityItemsToLoad(): Promise<void> {
 
   for (let i = 0; i < AUTOMATION_MAX_SCROLLS && stableScrollHeightCount < 3; i++) {
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
+    const scrollableContainers = Array.from(
+      document.querySelectorAll<HTMLElement>('div, main, section'),
+    ).filter((element) => {
+      const style = window.getComputedStyle(element);
+      return (
+        element.scrollHeight > element.clientHeight + 32 &&
+        (style.overflowY === 'auto' ||
+          style.overflowY === 'scroll' ||
+          style.overflowY === 'overlay' ||
+          element.getAttribute('role') === 'main')
+      );
+    });
+
+    for (const container of scrollableContainers) {
+      container.scrollTo({ top: container.scrollHeight, behavior: 'smooth' });
+      container.dispatchEvent(
+        new WheelEvent('wheel', { bubbles: true, deltaY: container.clientHeight }),
+      );
+    }
+
     await new Promise((resolve) => setTimeout(resolve, AUTOMATION_SCROLL_DELAY_MS));
 
     const currentScrollHeight = Math.max(
       document.documentElement.scrollHeight,
       document.body?.scrollHeight || 0,
+      ...scrollableContainers.map((container) => container.scrollHeight),
     );
     stableScrollHeightCount =
       currentScrollHeight === previousScrollHeight ? stableScrollHeightCount + 1 : 0;
@@ -120,8 +141,12 @@ function findSelectAllCheckbox(): HTMLElement | null {
   return (
     controls.find((control) => {
       if (!isVisible(control)) return false;
-      const text = getElementText(control.parentElement || control);
-      return text === 'all' || text.startsWith('all ') || text.includes(' all ');
+      let current: Element | null = control;
+      for (let depth = 0; current && depth < 4; depth++, current = current.parentElement) {
+        const text = getElementText(current);
+        if (text === 'all' || text.startsWith('all ') || text.includes(' all ')) return true;
+      }
+      return false;
     }) as HTMLElement | undefined
   ) || null;
 }
@@ -135,12 +160,19 @@ function findRemoveAllButton(): HTMLElement | null {
     controls.find((control) => {
       if (!isVisible(control)) return false;
       const text = getElementText(control);
-      return text === 'remove' || text === 'remove all' || text.endsWith(' remove');
+      return (
+        text === 'remove' ||
+        text === 'remove all' ||
+        text.includes('remove all') ||
+        text.endsWith(' remove')
+      );
     }) as HTMLElement | undefined
   ) || null;
 }
 
-async function runAutomaticReactionsCleanup(): Promise<void> {
+let reactionsAutomationRunning = false;
+
+async function runAutomaticReactionsCleanupImpl(): Promise<void> {
   if (detectPlatform() !== 'facebook') return;
 
   const storedNavigation = await getStoredNavigation();
@@ -202,6 +234,16 @@ async function runAutomaticReactionsCleanup(): Promise<void> {
 
   removeAll.click();
   logger.info('Automatic Likes & Reactions removal requested');
+}
+
+async function runAutomaticReactionsCleanup(): Promise<void> {
+  if (reactionsAutomationRunning) return;
+  reactionsAutomationRunning = true;
+  try {
+    await runAutomaticReactionsCleanupImpl();
+  } finally {
+    reactionsAutomationRunning = false;
+  }
 }
 
 /** Check security challenge via active adapter */
@@ -334,3 +376,6 @@ detectSecurityChallenge().then((hasChallenge) => {
 });
 
 void runAutomaticReactionsCleanup();
+window.setInterval(() => {
+  void runAutomaticReactionsCleanup();
+}, 5000);
