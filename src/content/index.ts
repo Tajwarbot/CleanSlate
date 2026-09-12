@@ -285,6 +285,7 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
       if (platform === 'messenger' || category === MessengerCategory.Conversations) {
         items = await msgerAdapter.discoverConversations();
       } else {
+        await waitForActivityItemsToLoad();
         items = await fbAdapter.scanActivity(category);
       }
 

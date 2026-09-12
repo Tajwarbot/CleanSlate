@@ -12,6 +12,7 @@ import { Footer } from './components/Footer';
 import { DashboardPage } from './pages/DashboardPage';
 import { ActivitySelectPage } from './pages/ActivitySelectPage';
 import { MessengerSelectPage } from './pages/MessengerSelectPage';
+import { GuidedCleanupPage } from './pages/GuidedCleanupPage';
 import { ScanResultsPage } from './pages/ScanResultsPage';
 import { ConfirmPage } from './pages/ConfirmPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -20,7 +21,13 @@ import { ErrorPage } from './pages/ErrorPage';
 import { SettingsPage } from './pages/SettingsPage';
 import { useExtension, type ProgressUpdate } from './hooks/useExtension';
 import { OperationState } from '../../types/state';
-import { DEFAULT_SETTINGS, type ActivityCategory, type CleanSlateSettings } from '../../types/common';
+import {
+  DEFAULT_SETTINGS,
+  FacebookCategory,
+  MessengerCategory,
+  type ActivityCategory,
+  type CleanSlateSettings,
+} from '../../types/common';
 import type { CleanupItem, OperationStats } from '../../types/operations';
 
 // ---- Pages ----
@@ -29,6 +36,7 @@ type Page =
   | 'dashboard'
   | 'activity_select'
   | 'messenger_select'
+  | 'guided_cleanup'
   | 'scan_results'
   | 'confirm'
   | 'progress'
@@ -88,6 +96,7 @@ type AppAction =
   | { type: 'TOGGLE_DRY_RUN' }
   | { type: 'SET_SETTINGS'; settings: CleanSlateSettings }
   | { type: 'SET_CATEGORY'; category: ActivityCategory }
+  | { type: 'SET_GUIDED_CATEGORY'; category: ActivityCategory }
   | { type: 'SET_DISCOVERED_ITEMS'; items: CleanupItem[] }
   | { type: 'SET_SELECTED_ITEMS'; items: CleanupItem[] }
   | { type: 'SET_STATS'; stats: OperationStats }
@@ -112,6 +121,8 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, settings: action.settings, dryRun: action.settings.dryRunDefault };
     case 'SET_CATEGORY':
       return { ...state, category: action.category };
+    case 'SET_GUIDED_CATEGORY':
+      return { ...state, category: action.category, page: 'guided_cleanup' };
     case 'SET_DISCOVERED_ITEMS':
       return { ...state, discoveredItems: action.items };
     case 'SET_SELECTED_ITEMS':
@@ -235,6 +246,12 @@ export function App() {
           dispatch({ type: 'SET_INTERRUPTED_SESSION', session: sessionResp.value.session });
         }
 
+        const pending = await chrome.storage.local.get('cleanslate_guided_category');
+        const pendingCategory = pending['cleanslate_guided_category'] as ActivityCategory | undefined;
+        if (pendingCategory) {
+          dispatch({ type: 'SET_GUIDED_CATEGORY', category: pendingCategory });
+        }
+
         // Detect platform
         try {
           const capResp = await ext.detectCapabilities();
@@ -277,75 +294,15 @@ export function App() {
     dispatch({ type: 'SET_PAGE', page: 'settings' });
   }, []);
 
-  const openFacebookActivityLog = useCallback(async () => {
-    const targetUrl = new URL('https://www.facebook.com/me/allactivity');
-    targetUrl.searchParams.set('category_key', 'LIKESANDREACTIONSCLUSTER');
-    const mode = state.dryRun ? 'preview' : 'execute';
-    targetUrl.searchParams.set('cleanslate_action', 'reactions_cleanup');
-    targetUrl.searchParams.set('cleanslate_mode', mode);
-    targetUrl.hash = `cleanslate_action=reactions_cleanup&cleanslate_mode=${mode}`;
-
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      await chrome.storage.local.set({
-        cleanslate_navigation: {
-          platform: 'facebook',
-          category: 'likes_reactions',
-          action: 'reactions_cleanup',
-          mode,
-        },
-      });
-      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
-      const activeTab = tabs[0];
-      const targetTab = activeTab?.id && activeTab.url?.includes('facebook.com')
-        ? activeTab
-        : await chrome.tabs.create({ url: targetUrl.toString() });
-      if (targetTab.id) {
-        await chrome.storage.local.set({
-          cleanslate_navigation: {
-            platform: 'facebook',
-            category: 'likes_reactions',
-            action: 'reactions_cleanup',
-            mode,
-            tabId: targetTab.id,
-          },
-        });
-        await chrome.tabs.update(targetTab.id, { url: targetUrl.toString() });
-      }
-      return;
-    }
-
-    window.open(targetUrl.toString(), '_blank');
-  }, [state.dryRun]);
-
-  const openMessengerConversations = useCallback(async () => {
-    const targetUrl = 'https://www.messenger.com/';
-
-    if (typeof chrome !== 'undefined' && chrome.tabs) {
-      await chrome.storage.local.set({
-        cleanslate_navigation: {
-          platform: 'messenger',
-          category: 'conversations',
-          action: 'scan',
-          mode: state.dryRun ? 'preview' : 'execute',
-        },
-      });
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab?.id && activeTab.url?.includes('messenger.com')) {
-          chrome.tabs.update(activeTab.id, { url: targetUrl });
-        } else {
-          chrome.tabs.create({ url: targetUrl });
-        }
-      });
-      return;
-    }
-
-    window.open(targetUrl, '_blank');
-  }, [state.dryRun]);
+  const beginGuidedCleanup = useCallback(async (category: ActivityCategory) => {
+    await chrome.storage.local.set({ cleanslate_guided_category: category });
+    dispatch({ type: 'SET_GUIDED_CATEGORY', category });
+  }, []);
 
   const handleScan = useCallback(
     async (category: ActivityCategory) => {
       dispatch({ type: 'SET_CATEGORY', category });
+      await chrome.storage.local.remove('cleanslate_guided_category');
       dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Scanning });
 
       try {
@@ -472,7 +429,7 @@ export function App() {
             platform={state.platform}
             dryRun={state.dryRun}
             onDryRunToggle={() => dispatch({ type: 'TOGGLE_DRY_RUN' })}
-            onFacebookClick={openFacebookActivityLog}
+            onFacebookClick={() => beginGuidedCleanup(FacebookCategory.LikesReactions)}
             onMessengerClick={() => dispatch({ type: 'SET_PAGE', page: 'messenger_select' })}
             interruptedSession={state.interruptedSession}
             onReviewSession={handleReviewSession}
@@ -483,14 +440,22 @@ export function App() {
 
         {state.page === 'activity_select' && (
           <ActivitySelectPage
-            onScan={handleScan}
+            onScan={beginGuidedCleanup}
             onCancel={goToDashboard}
           />
         )}
 
         {state.page === 'messenger_select' && (
           <MessengerSelectPage
-            onOpenConversations={openMessengerConversations}
+            onOpenConversations={() => beginGuidedCleanup(MessengerCategory.Conversations)}
+            onCancel={goToDashboard}
+          />
+        )}
+
+        {state.page === 'guided_cleanup' && state.category && (
+          <GuidedCleanupPage
+            category={state.category}
+            onStart={handleScan}
             onCancel={goToDashboard}
           />
         )}
