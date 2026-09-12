@@ -342,6 +342,28 @@ function isSelectedCategoryControl(control: HTMLElement): boolean {
   return /\b(active|selected|current)\b/i.test(control.className);
 }
 
+function hasActivityCategoryHeading(
+  category: ActivityCategory,
+  selectAll: HTMLElement | null,
+): boolean {
+  if (!selectAll) return false;
+  const terms = categorySearchTerms(category);
+  const headings = Array.from(
+    document.querySelectorAll<HTMLElement>('h1, h2, h3, [role="heading"]'),
+  ).filter(isVisible);
+
+  return headings.some((heading) => {
+    const text = getElementText(heading);
+    if (!terms.some((term) => text === term || text.includes(term))) return false;
+
+    let current: HTMLElement | null = heading;
+    for (let depth = 0; current && depth < 8; depth++, current = current.parentElement) {
+      if (current.contains(selectAll)) return true;
+    }
+    return false;
+  });
+}
+
 function getActivityContext(category?: ActivityCategory): {
   platform: 'facebook' | 'messenger' | 'unknown';
   url: string;
@@ -361,9 +383,12 @@ function getActivityContext(category?: ActivityCategory): {
   const currentUrl = new URL(window.location.href);
   const control = category ? findCategoryControl(category) : null;
   const controlState = control ? isSelectedCategoryControl(control) : false;
+  const activityHeading = category
+    ? hasActivityCategoryHeading(category, findSelectAllCheckbox())
+    : false;
   // Facebook can preserve category_key in the URL while rendering the
   // general Activity Log. Treat the rendered control state as authoritative.
-  const categorySelected = Boolean(control && controlState);
+  const categorySelected = Boolean((control && controlState) || activityHeading);
 
   if (!isActivityLogUrl(currentUrl)) {
     return {
