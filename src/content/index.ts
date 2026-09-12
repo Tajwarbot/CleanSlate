@@ -47,6 +47,15 @@ function getProfileIdFromPage(): string | null {
   return linkMatch?.[1] || null;
 }
 
+function isActivityLogUrl(url: URL): boolean {
+  return (
+    url.pathname.includes('/me/allactivity') ||
+    /^\/\d+\/allactivity/.test(url.pathname) ||
+    (url.pathname === '/profile.php' &&
+      url.searchParams.get('sk')?.toLowerCase() === 'allactivity')
+  );
+}
+
 function isVisible(element: Element): element is HTMLElement {
   const htmlElement = element as HTMLElement;
   return Boolean(htmlElement.isConnected && htmlElement.getClientRects().length > 0);
@@ -316,6 +325,58 @@ function findCategoryControl(category: ActivityCategory): HTMLElement | null {
   );
 }
 
+function getActivityContext(category?: ActivityCategory): {
+  platform: 'facebook' | 'messenger' | 'unknown';
+  url: string;
+  page: 'activity-category' | 'activity-default' | 'other';
+  categorySelected: boolean;
+} {
+  const platform = detectPlatform();
+  if (platform !== 'facebook') {
+    return {
+      platform,
+      url: window.location.href,
+      page: platform === 'messenger' ? 'other' : 'other',
+      categorySelected: false,
+    };
+  }
+
+  const currentUrl = new URL(window.location.href);
+  const requestedKey =
+    category === FacebookCategory.LikesReactions
+      ? 'LIKEDPOSTS'
+      : category === FacebookCategory.Comments
+        ? 'COMMENTSCLUSTER'
+        : category === FacebookCategory.Posts
+          ? 'MANAGEPOSTSPHOTOSANDVIDEOS'
+          : null;
+  const urlCategory = currentUrl.searchParams.get('category_key')?.toUpperCase();
+  const control = category ? findCategoryControl(category) : null;
+  const controlState = control
+    ? control.getAttribute('aria-current') || control.getAttribute('aria-selected')
+    : null;
+  const categorySelected =
+    Boolean(requestedKey && urlCategory === requestedKey) ||
+    controlState === 'page' ||
+    controlState === 'true';
+
+  if (!isActivityLogUrl(currentUrl)) {
+    return {
+      platform,
+      url: currentUrl.href,
+      page: 'other',
+      categorySelected: false,
+    };
+  }
+
+  return {
+    platform,
+    url: currentUrl.href,
+    page: categorySelected ? 'activity-category' : 'activity-default',
+    categorySelected,
+  };
+}
+
 async function selectRenderedCategory(category: ActivityCategory): Promise<void> {
   if (category === MessengerCategory.Conversations) return;
 
@@ -428,6 +489,9 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
   switch (msg['type']) {
     case 'GET_PROFILE_CONTEXT':
       return { profileId: getProfileIdFromPage(), url: window.location.href };
+
+    case 'GET_ACTIVITY_CONTEXT':
+      return getActivityContext(msg['category'] as ActivityCategory | undefined);
 
     case 'DETECT_CAPABILITIES': {
       const caps =

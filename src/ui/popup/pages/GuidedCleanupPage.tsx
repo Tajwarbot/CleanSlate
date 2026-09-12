@@ -83,6 +83,7 @@ function getDestination(category: ActivityCategory, profileId: string | null): {
 export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanupPageProps) {
   const [currentUrl, setCurrentUrl] = useState('');
   const [message, setMessage] = useState('');
+  const [pageKind, setPageKind] = useState<'specific' | 'default' | 'other' | 'unknown'>('unknown');
   const profileId = getFacebookProfileId(currentUrl) ||
     currentUrl.match(/cleanslate-profile=(\d+)/)?.[1] ||
     null;
@@ -95,7 +96,23 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const activeTab = tabs[0];
     let nextUrl = activeTab?.url || '';
+    let nextPageKind: typeof pageKind = 'other';
     if (activeTab?.id && nextUrl.includes('facebook.com')) {
+      try {
+        const activityContext = await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'GET_ACTIVITY_CONTEXT',
+          category,
+        }) as { url?: string; page?: 'activity-category' | 'activity-default' | 'other' };
+        if (activityContext.url) nextUrl = activityContext.url;
+        nextPageKind =
+          activityContext.page === 'activity-category'
+            ? 'specific'
+            : activityContext.page === 'activity-default'
+              ? 'default'
+              : 'other';
+      } catch {
+        // Fall back to URL/profile checks when the content script is unavailable.
+      }
       try {
         const context = await chrome.tabs.sendMessage(activeTab.id, {
           type: 'GET_PROFILE_CONTEXT',
@@ -103,6 +120,7 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
         if (context.url) nextUrl = context.url;
         if (context.profileId && category !== MessengerCategory.Conversations) {
           setCurrentUrl(`${nextUrl}#cleanslate-profile=${context.profileId}`);
+          setPageKind(nextPageKind);
           return;
         }
       } catch {
@@ -110,13 +128,19 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
       }
     }
     setCurrentUrl(nextUrl);
+    setPageKind(nextPageKind);
   };
 
   useEffect(() => {
     refreshPageCheck();
-  }, []);
+    const timer = window.setInterval(refreshPageCheck, 800);
+    return () => window.clearInterval(timer);
+  }, [category]);
 
-  const isCorrectPage = destination.matches(currentUrl);
+  const isCorrectPage =
+    category === MessengerCategory.Conversations
+      ? destination.matches(currentUrl)
+      : pageKind === 'specific';
 
   const openDestination = async () => {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
@@ -149,11 +173,14 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
   };
 
   const verifyAndStart = () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const url = tabs[0]?.url || '';
-      if (!destination.matches(url)) {
-        setCurrentUrl(url);
-        setMessage(`Open ${destination.label} first. CleanSlate will not scan this page.`);
+    chrome.tabs.query({ active: true, currentWindow: true }, () => {
+      if (!isCorrectPage) {
+        void refreshPageCheck();
+        setMessage(
+          pageKind === 'default'
+            ? `You are on Facebook's general Activity Log. Open the specific ${destination.label} category before scanning.`
+            : `Open the specific ${destination.label} page first. CleanSlate will not scan this page.`,
+        );
         return;
       }
       setMessage('Correct page confirmed. Loading activity now…');
@@ -187,7 +214,23 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
           {currentUrl || 'Unable to read the active tab'}
         </div>
         <div style={{ marginTop: 'var(--cs-space-sm)', fontWeight: 600 }}>
-          {isCorrectPage ? 'Ready to load' : 'Wrong page'}
+          {isCorrectPage
+            ? `Specific ${destination.label} page detected`
+            : pageKind === 'default'
+              ? 'Facebook default Activity Log detected'
+              : pageKind === 'other'
+                ? 'Not on the Activity Log category'
+                : 'Checking active page…'}
+        </div>
+      </div>
+
+      <div className="cs-card" style={{ padding: 'var(--cs-space-md)', marginBottom: 'var(--cs-space-md)' }}>
+        <div style={{ fontWeight: 700, marginBottom: 'var(--cs-space-xs)' }}>
+          How selection works
+        </div>
+        <div className="cs-settings__label-desc">
+          Facebook’s native <strong>All</strong> checkbox selects the loaded activity. CleanSlate
+          then uses Facebook’s own <strong>Remove</strong> button and confirmation.
         </div>
       </div>
 
