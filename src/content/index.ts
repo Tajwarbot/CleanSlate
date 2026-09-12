@@ -364,6 +364,10 @@ function hasActivityCategoryHeading(
   });
 }
 
+function isActivityCategoryContentReady(category: ActivityCategory): boolean {
+  return hasActivityCategoryHeading(category, findSelectAllCheckbox());
+}
+
 function getActivityContext(category?: ActivityCategory): {
   platform: 'facebook' | 'messenger' | 'unknown';
   url: string;
@@ -409,6 +413,10 @@ function getActivityContext(category?: ActivityCategory): {
 
 async function selectRenderedCategory(category: ActivityCategory): Promise<void> {
   if (category === MessengerCategory.Conversations) return;
+
+  // If Facebook is already rendering the requested activity section, do not
+  // click a similarly named navigation item; that can route back through Home.
+  if (isActivityCategoryContentReady(category)) return;
 
   const control = await waitForControl(() => findCategoryControl(category));
   if (!control) {
