@@ -2,51 +2,22 @@
  * CleanSlate Content Script
  *
  * Runs on Facebook and Messenger pages.
- * Observes DOM for security challenges, navigation changes,
- * and provides scanning/execution capabilities to the service worker.
+ * Integrates live DOM adapters for scanning and executing cleanup actions.
  *
  * Security: Treats all DOM content as untrusted input.
  * Never interprets page text as instructions.
  */
 
 import { logger } from '../core/logging/logger';
+import { LiveFacebookAdapter } from '../adapters/facebook-adapter';
+import { LiveMessengerAdapter } from '../adapters/messenger-adapter';
+import { ActionStatus, FacebookCategory, MessengerCategory, type ActivityCategory } from '../types/common';
+import type { CleanupItem } from '../types/operations';
 
-/** Security challenge detection patterns */
-const SECURITY_CHALLENGE_INDICATORS = [
-  // Checkpoint patterns
-  '[id*="checkpoint"]',
-  '[class*="checkpoint"]',
-  // CAPTCHA patterns
-  '[id*="captcha"]',
-  '[class*="captcha"]',
-  'iframe[src*="captcha"]',
-  // Security verification
-  '[data-testid*="security"]',
-  '[data-testid*="verification"]',
-] as const;
+const fbAdapter = new LiveFacebookAdapter();
+const msgerAdapter = new LiveMessengerAdapter();
 
-/**
- * Check if a security challenge is currently displayed.
- */
-function detectSecurityChallenge(): boolean {
-  for (const selector of SECURITY_CHALLENGE_INDICATORS) {
-    try {
-      if (document.querySelector(selector)) {
-        logger.warn('Security challenge detected on page', {
-          context: { selector },
-        });
-        return true;
-      }
-    } catch {
-      // Selector failed — not a security issue, just skip
-    }
-  }
-  return false;
-}
-
-/**
- * Determine which platform we're on.
- */
+/** Determine which platform we're on */
 function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
   const hostname = window.location.hostname;
   if (hostname.includes('messenger.com')) return 'messenger';
@@ -54,9 +25,96 @@ function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
   return 'unknown';
 }
 
-/**
- * Handle incoming messages from the service worker.
- */
+/** Check security challenge via active adapter */
+async function detectSecurityChallenge(): Promise<boolean> {
+  const platform = detectPlatform();
+  if (platform === 'messenger') {
+    return msgerAdapter.detectSecurityChallenge();
+  }
+  return fbAdapter.detectSecurityChallenge();
+}
+
+/** Handle incoming messages from the service worker */
+async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown> {
+  const platform = detectPlatform();
+
+  switch (msg['type']) {
+    case 'DETECT_CAPABILITIES': {
+      const caps =
+        platform === 'messenger'
+          ? await msgerAdapter.detectCapabilities()
+          : await fbAdapter.detectCapabilities();
+      return {
+        platform,
+        capabilities: caps.capabilities,
+        securityChallenge: await detectSecurityChallenge(),
+      };
+    }
+
+    case 'SCAN_REQUEST': {
+      const category = (msg['category'] as ActivityCategory) || FacebookCategory.Comments;
+      logger.info('Received SCAN_REQUEST in content script', { context: { category, platform } });
+
+      let items: ReadonlyArray<CleanupItem> = [];
+
+      if (platform === 'messenger' || category === MessengerCategory.Conversations) {
+        items = await msgerAdapter.discoverConversations();
+      } else {
+        items = await fbAdapter.scanActivity(category);
+      }
+
+      return {
+        status: 'success',
+        items: [...items],
+      };
+    }
+
+    case 'EXECUTE_ITEM': {
+      const item = msg['item'] as CleanupItem;
+      if (!item) {
+        return { status: 'error', error: 'Missing item in EXECUTE_ITEM request' };
+      }
+
+      logger.info('Received EXECUTE_ITEM in content script', { context: { itemId: item.id } });
+
+      let result;
+      if (platform === 'messenger' || item.category === MessengerCategory.Conversations) {
+        result = await msgerAdapter.execute(item);
+      } else {
+        result = await fbAdapter.execute(item);
+      }
+
+      return {
+        status: result.status === ActionStatus.Success ? 'success' : 'failed',
+        result,
+      };
+    }
+
+    case 'VERIFY_ITEM': {
+      const item = msg['item'] as CleanupItem;
+      if (!item) {
+        return { status: 'error', error: 'Missing item in VERIFY_ITEM request' };
+      }
+
+      let verification;
+      if (platform === 'messenger' || item.category === MessengerCategory.Conversations) {
+        verification = await msgerAdapter.verify(item);
+      } else {
+        verification = await fbAdapter.verify(item);
+      }
+
+      return {
+        status: 'success',
+        verification,
+      };
+    }
+
+    default:
+      return { error: 'Unknown message type' };
+  }
+}
+
+/** Synchronous chrome.runtime message listener wrapper */
 function handleMessage(
   message: unknown,
   _sender: chrome.runtime.MessageSender,
@@ -67,29 +125,13 @@ function handleMessage(
     return false;
   }
 
-  const msg = message as Record<string, unknown>;
-
-  switch (msg['type']) {
-    case 'DETECT_CAPABILITIES':
+  handleMessageAsync(message as Record<string, unknown>)
+    .then((res) => sendResponse(res))
+    .catch((err) =>
       sendResponse({
-        platform: detectPlatform(),
-        securityChallenge: detectSecurityChallenge(),
-      });
-      break;
-
-    case 'SCAN_REQUEST':
-      // Scanning will be implemented in Phase 4+
-      sendResponse({ items: [], status: 'not_implemented' });
-      break;
-
-    case 'EXECUTE_ITEM':
-      // Execution will be implemented in Phase 4+
-      sendResponse({ status: 'not_implemented' });
-      break;
-
-    default:
-      sendResponse({ error: 'Unknown message type' });
-  }
+        error: err instanceof Error ? err.message : 'Content script execution error',
+      }),
+    );
 
   return true;
 }
@@ -97,16 +139,17 @@ function handleMessage(
 // Register message listener
 chrome.runtime.onMessage.addListener(handleMessage);
 
-// Initial platform detection
-const platform = detectPlatform();
-logger.info('CleanSlate content script loaded', {
+// Initial status logging
+const currentPlatform = detectPlatform();
+logger.info('CleanSlate content script initialized', {
   context: {
-    platform,
-    url: window.location.hostname, // Only hostname, no path/query for privacy
+    platform: currentPlatform,
+    url: window.location.hostname,
   },
 });
 
-// Initial security challenge check
-if (detectSecurityChallenge()) {
-  logger.warn('Security challenge detected on page load');
-}
+detectSecurityChallenge().then((hasChallenge) => {
+  if (hasChallenge) {
+    logger.warn('Security challenge detected on initial page load');
+  }
+});
