@@ -210,17 +210,34 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
         <div style={{ fontSize: 'var(--cs-font-size-xs)', color: 'var(--cs-text-tertiary)', marginBottom: 'var(--cs-space-xs)' }}>
           CURRENT PAGE
         </div>
-        <div style={{ wordBreak: 'break-all', color: isCorrectPage ? 'var(--cs-success-400)' : 'var(--cs-text-secondary)' }}>
-          {currentUrl || 'Unable to read the active tab'}
-        </div>
-        <div style={{ marginTop: 'var(--cs-space-sm)', fontWeight: 600 }}>
+        <div
+          style={{
+            color: isCorrectPage ? 'var(--cs-success-400)' : 'var(--cs-text-primary)',
+            fontWeight: 700,
+          }}
+        >
           {isCorrectPage
-            ? `Specific ${destination.label} page detected`
+            ? `Specific ${destination.label} page`
             : pageKind === 'default'
-              ? 'Facebook default Activity Log detected'
+              ? 'Facebook default Activity Log page'
               : pageKind === 'other'
-                ? 'Not on the Activity Log category'
-                : 'Checking active page…'}
+                ? 'Not on the Facebook Activity Log page'
+                : 'Checking the current page…'}
+        </div>
+        <div
+          style={{
+            marginTop: 'var(--cs-space-xs)',
+            color: 'var(--cs-text-secondary)',
+            fontSize: 'var(--cs-font-size-sm)',
+          }}
+        >
+          {isCorrectPage
+            ? 'The requested category is selected and ready to load.'
+            : pageKind === 'default'
+              ? `Facebook opened the general log. Open the specific ${destination.label} page.`
+              : pageKind === 'other'
+                ? `Open the specific ${destination.label} page before scanning.`
+                : 'Waiting for Facebook to finish loading its activity page.'}
         </div>
       </div>
 
@@ -241,9 +258,9 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
       )}
 
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--cs-space-sm)' }}>
-        {!isCorrectPage && (
+        {category !== MessengerCategory.Conversations && (
           <button className="cs-btn cs-btn--primary cs-btn--full" onClick={openDestination} type="button">
-            Open correct page
+            {isCorrectPage ? 'Open specific page again' : 'Open specific page'}
           </button>
         )}
         <button className="cs-btn cs-btn--primary cs-btn--full" onClick={verifyAndStart} type="button">

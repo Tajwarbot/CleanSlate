@@ -325,6 +325,16 @@ function findCategoryControl(category: ActivityCategory): HTMLElement | null {
   );
 }
 
+function hasRenderedCategoryHeading(category: ActivityCategory): boolean {
+  const terms = categorySearchTerms(category);
+  return Array.from(document.querySelectorAll<HTMLElement>('h1, h2, h3, [role="heading"]'))
+    .filter(isVisible)
+    .some((heading) => {
+      const text = getElementText(heading);
+      return terms.some((term) => text === term || text.includes(term));
+    });
+}
+
 function getActivityContext(category?: ActivityCategory): {
   platform: 'facebook' | 'messenger' | 'unknown';
   url: string;
@@ -342,23 +352,16 @@ function getActivityContext(category?: ActivityCategory): {
   }
 
   const currentUrl = new URL(window.location.href);
-  const requestedKey =
-    category === FacebookCategory.LikesReactions
-      ? 'LIKEDPOSTS'
-      : category === FacebookCategory.Comments
-        ? 'COMMENTSCLUSTER'
-        : category === FacebookCategory.Posts
-          ? 'MANAGEPOSTSPHOTOSANDVIDEOS'
-          : null;
-  const urlCategory = currentUrl.searchParams.get('category_key')?.toUpperCase();
   const control = category ? findCategoryControl(category) : null;
   const controlState = control
     ? control.getAttribute('aria-current') || control.getAttribute('aria-selected')
     : null;
+  // Facebook can preserve category_key in the URL while rendering the
+  // general Activity Log. Treat the rendered control state as authoritative.
   const categorySelected =
-    Boolean(requestedKey && urlCategory === requestedKey) ||
     controlState === 'page' ||
-    controlState === 'true';
+    controlState === 'true' ||
+    (Boolean(category) && hasRenderedCategoryHeading(category as ActivityCategory));
 
   if (!isActivityLogUrl(currentUrl)) {
     return {
