@@ -18,6 +18,8 @@ function getCategoryKey(category: ActivityCategory): string {
       ? 'COMMENTSCLUSTER'
       : category === FacebookCategory.Posts
         ? 'MANAGEPOSTSPHOTOSANDVIDEOS'
+        : category === FacebookCategory.Follows
+          ? 'LIKEDINTERESTS'
         : '';
 }
 
@@ -49,9 +51,9 @@ function buildFacebookActivityUrl(category: ActivityCategory, profileId: string 
 function getDestination(category: ActivityCategory, profileId: string | null): { label: string; url: string; matches: (url: string) => boolean } {
   if (category === MessengerCategory.Conversations) {
     return {
-      label: 'Messenger conversations',
+      label: 'messages in the open Messenger conversation',
       url: 'https://www.messenger.com/',
-      matches: (url) => url.includes('messenger.com'),
+      matches: (url) => /messenger\.com\/t\/|facebook\.com\/messages\/t\//.test(url),
     };
   }
 

@@ -59,6 +59,8 @@ export interface MessengerAdapter {
 
   /** Discover conversations */
   discoverConversations(): Promise<ReadonlyArray<CleanupItem>>;
+  /** Discover messages only in the currently open conversation */
+  discoverMessagesInOpenConversation(): Promise<ReadonlyArray<CleanupItem>>;
 
   /** Preview selected conversations for deletion */
   preview(items: ReadonlyArray<CleanupItem>): Promise<Preview>;

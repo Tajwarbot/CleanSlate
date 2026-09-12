@@ -21,8 +21,8 @@ export function MessengerSelectPage({
       <div className="cs-activity__categories">
         <CategoryCard
           id={`category-${MessengerCategory.Conversations}`}
-          name="Conversations"
-          description="Delete Messenger conversations"
+          name="Open conversation messages"
+          description="Delete messages only from the chat you currently opened"
           onClick={onOpenConversations}
         />
       </div>

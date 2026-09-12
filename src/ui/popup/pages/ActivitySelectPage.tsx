@@ -30,7 +30,7 @@ const CATEGORIES = [
   {
     value: FacebookCategory.Follows,
     name: 'Follows',
-    description: 'Unfollow people and pages',
+    description: 'Remove follows from Activity Log',
   },
   {
     value: FacebookCategory.Posts,

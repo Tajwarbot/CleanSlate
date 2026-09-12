@@ -555,7 +555,7 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
       let items: ReadonlyArray<CleanupItem> = [];
 
       if (platform === 'messenger' || category === MessengerCategory.Conversations) {
-        items = await msgerAdapter.discoverConversations();
+        items = await msgerAdapter.discoverMessagesInOpenConversation();
       } else {
         await selectRenderedCategory(category);
         const loadingCompleted = await waitForActivityItemsToLoad(category);

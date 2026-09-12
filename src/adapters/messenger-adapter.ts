@@ -40,6 +40,12 @@ const SELECTORS = {
     'div[role="navigation"] a[href*="/t/"]',
     'div[role="grid"] > div',
   ],
+  messageItem: [
+    '[data-message-id]',
+    '[data-testid*="message"]',
+    '[role="main"] [role="row"]',
+    'main [role="listitem"]',
+  ],
   optionsButton: [
     '[aria-label="Menu"]',
     '[aria-label="More options"]',
@@ -74,6 +80,8 @@ const SELECTORS = {
 } as const;
 
 export class LiveMessengerAdapter implements MessengerAdapter {
+  private messageTargets = new Map<string, Element>();
+
   async detectCapabilities(): Promise<DetectedCapabilities> {
     const isMessenger =
       window.location.hostname.includes('messenger.com') ||
@@ -125,6 +133,35 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     return items;
   }
 
+    async discoverMessagesInOpenConversation(): Promise<ReadonlyArray<CleanupItem>> {
+      logger.info('Discovering messages in the currently open Messenger conversation');
+
+      const main = document.querySelector('main, [role="main"]');
+      if (!main) return [];
+
+      const elements = this.findAllElements(SELECTORS.messageItem).filter((element) => {
+        if (!main.contains(element)) return false;
+        if (element.closest('[role="navigation"], [role="grid"], [aria-label="Chats"]')) return false;
+        return Boolean((element.textContent || '').trim());
+      });
+
+      this.messageTargets.clear();
+      return elements.map((element, index) => {
+        const label = (element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160);
+        const id = generateItemId();
+        this.messageTargets.set(id, element);
+        return {
+          id,
+          category: MessengerCategory.Conversations,
+          label: label || `Message ${index + 1}`,
+          description: 'Message in the currently open conversation',
+          timestamp: Date.now(),
+          url: window.location.href,
+          actionable: true,
+        };
+      });
+    }
+
   async preview(items: ReadonlyArray<CleanupItem>): Promise<Preview> {
     return {
       category: MessengerCategory.Conversations,
@@ -145,7 +182,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
 
   async execute(item: CleanupItem): Promise<ActionResult> {
     const startTime = Date.now();
-    logger.info('Deleting Messenger conversation', { context: { itemId: item.id } });
+    logger.info('Deleting Messenger message', { context: { itemId: item.id } });
 
     if (await this.detectSecurityChallenge()) {
       return {
@@ -158,39 +195,30 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     }
 
     try {
-      const threads = this.findAllElements(SELECTORS.threadItem);
-      let targetThread: Element | null = null;
+      const targetMessage = this.messageTargets.get(item.id) ||
+        this.findAllElements(SELECTORS.messageItem).find((element) =>
+          element.textContent?.includes(item.label.substring(0, 20)),
+        ) || null;
 
-      for (const t of threads) {
-        if (t && t.textContent?.includes(item.label.substring(0, 20))) {
-          targetThread = t;
-          break;
-        }
-      }
-
-      if (!targetThread && threads.length > 0 && threads[0]) {
-        targetThread = threads[0];
-      }
-
-      if (!targetThread) {
+      if (!targetMessage) {
         return {
           itemId: item.id,
           status: ActionStatus.Failed,
-          message: 'Conversation element not found',
+          message: 'Message element in the open conversation was not found',
           timestamp: Date.now(),
           durationMs: Date.now() - startTime,
         };
       }
 
-      targetThread.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
+      targetMessage.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       await delayWithJitter(400);
 
-      const optionsBtn = this.findFirstChild(targetThread, SELECTORS.optionsButton) as HTMLElement | null;
+      const optionsBtn = this.findFirstChild(targetMessage, SELECTORS.optionsButton) as HTMLElement | null;
       if (!optionsBtn) {
         return {
           itemId: item.id,
           status: ActionStatus.Failed,
-          message: 'Conversation menu button not found',
+          message: 'Message menu button not found',
           timestamp: Date.now(),
           durationMs: Date.now() - startTime,
         };
@@ -230,7 +258,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
         return {
           itemId: item.id,
           status: ActionStatus.Failed,
-          message: 'Delete Chat action not found in menu',
+          message: 'Delete message action not found in menu',
           timestamp: Date.now(),
           durationMs: Date.now() - startTime,
         };
@@ -266,14 +294,15 @@ export class LiveMessengerAdapter implements MessengerAdapter {
   }
 
   async verify(item: CleanupItem): Promise<VerificationResult> {
-    const threads = this.findAllElements(SELECTORS.threadItem);
-    const exists = threads.some((t) => t && t.textContent?.includes(item.label.substring(0, 20)));
+    const exists = this.findAllElements(SELECTORS.messageItem).some((message) =>
+      message.textContent?.includes(item.label.substring(0, 20)),
+    );
 
     return {
       itemId: item.id,
       verified: !exists,
       status: !exists ? ActionStatus.Success : ActionStatus.Failed,
-      message: !exists ? 'Conversation deleted' : 'Conversation still present',
+      message: !exists ? 'Message deleted' : 'Message still present',
       timestamp: Date.now(),
     };
   }
