@@ -54,7 +54,7 @@ export function ProgressPage({
   return (
     <div className="cs-page">
       <div className="cs-progress-page__title">
-        {dryRun ? 'Dry Run in Progress' : paused ? 'Paused' : 'Cleaning up...'}
+        {dryRun ? 'Safety Preview in Progress' : paused ? 'Paused' : 'Cleaning up...'}
       </div>
 
       <ProgressBar percentage={percentage} variant={paused ? 'default' : 'success'} />

@@ -95,7 +95,7 @@ export function DashboardPage({
         </div>
       </div>
 
-      {/* Dry-Run Toggle */}
+      {/* Safety preview toggle */}
       <div className="cs-dashboard__status-row" style={{ marginBottom: 'var(--cs-space-lg)' }}>
         <label className="cs-checkbox" htmlFor="dry-run-toggle">
           <input
@@ -105,7 +105,7 @@ export function DashboardPage({
             checked={dryRun}
             onChange={onDryRunToggle}
           />
-          <span className="cs-checkbox__label">Dry Run Mode</span>
+          <span className="cs-checkbox__label">Safety Preview Mode</span>
         </label>
       </div>
 

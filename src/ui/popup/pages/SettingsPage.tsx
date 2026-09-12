@@ -42,7 +42,7 @@ export function SettingsPage({ settings, onSave, onReset, onBack }: SettingsPage
 
         <div className="cs-settings__row">
           <div className="cs-settings__label">
-            <span className="cs-settings__label-text">Dry Run by Default</span>
+            <span className="cs-settings__label-text">Safety Preview by Default</span>
             <span className="cs-settings__label-desc">
               Scan and preview without making changes
             </span>

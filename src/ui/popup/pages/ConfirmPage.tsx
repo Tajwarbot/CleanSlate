@@ -44,7 +44,7 @@ export function ConfirmPage({
             fontWeight: 600,
           }}
         >
-          [DRY RUN] No actual deletions will occur.
+          [SAFETY PREVIEW] Facebook's Remove button will not be clicked.
         </div>
       )}
 
@@ -66,7 +66,7 @@ export function ConfirmPage({
           onClick={onConfirm}
           type="button"
         >
-          {dryRun ? 'Start Dry Run' : 'I Understand — Start Cleanup'}
+          {dryRun ? 'Start Safety Preview' : 'I Understand — Start Cleanup'}
         </button>
         <button
           id="confirm-cancel-btn"

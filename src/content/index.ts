@@ -18,10 +18,11 @@ const fbAdapter = new LiveFacebookAdapter();
 const msgerAdapter = new LiveMessengerAdapter();
 
 const AUTOMATION_SETTLE_DELAY_MS = 1200;
-const AUTOMATION_SCROLL_DELAY_MS = 700;
-const AUTOMATION_MAX_SCROLLS = 40;
+const AUTOMATION_SCROLL_DELAY_MS = 1100;
+const AUTOMATION_MAX_SCROLLS = 80;
 const AUTOMATION_WAIT_TIMEOUT_MS = 30000;
 const AUTOMATION_POLL_INTERVAL_MS = 500;
+const AUTOMATION_STABLE_PASSES_TO_FINISH = 8;
 
 /** Determine which platform we're on */
 function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
@@ -129,10 +130,15 @@ async function waitForActivityItemsToLoad(category?: ActivityCategory): Promise<
   await writeProgress('Preparing Facebook', 'Waiting for the Activity Log controls to render.');
   await new Promise((resolve) => setTimeout(resolve, AUTOMATION_SETTLE_DELAY_MS));
 
-  let stableScrollHeightCount = 0;
+  let stableContentCount = 0;
   let previousScrollHeight = 0;
+  let previousItemCount = 0;
 
-  for (let i = 0; i < AUTOMATION_MAX_SCROLLS && stableScrollHeightCount < 3; i++) {
+  for (
+    let i = 0;
+    i < AUTOMATION_MAX_SCROLLS && stableContentCount < AUTOMATION_STABLE_PASSES_TO_FINISH;
+    i++
+  ) {
     if (await isScanStopRequested()) {
       await writeProgress(
         'Stopped at current batch',
@@ -176,9 +182,13 @@ async function waitForActivityItemsToLoad(category?: ActivityCategory): Promise<
       document.body?.scrollHeight || 0,
       ...scrollableContainers.map((container) => container.scrollHeight),
     );
-    stableScrollHeightCount =
-      currentScrollHeight === previousScrollHeight ? stableScrollHeightCount + 1 : 0;
+    const currentItemCount = document.querySelectorAll('[role="row"], [role="article"]').length;
+    stableContentCount =
+      currentScrollHeight === previousScrollHeight && currentItemCount === previousItemCount
+        ? stableContentCount + 1
+        : 0;
     previousScrollHeight = currentScrollHeight;
+    previousItemCount = currentItemCount;
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });

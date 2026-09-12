@@ -37,7 +37,7 @@ export function CompletePage({
   ];
 
   const title = dryRun
-    ? 'Dry Run Complete'
+    ? 'Safety Preview Complete'
     : stoppedByUser
       ? 'Cleanup Stopped'
       : 'Cleanup Complete';
