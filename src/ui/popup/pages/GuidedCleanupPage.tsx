@@ -53,7 +53,8 @@ function getDestination(category: ActivityCategory, profileId: string | null): {
     return {
       label: 'messages in the open Messenger conversation',
       url: 'https://www.messenger.com/',
-      matches: (url) => /messenger\.com\/t\/|facebook\.com\/messages\/t\//.test(url),
+      matches: (url) =>
+        /messenger\.com\/(?:e2ee\/)?t\/|facebook\.com\/messages\/t\//.test(url),
     };
   }
 
@@ -99,6 +100,14 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
     const activeTab = tabs[0];
     let nextUrl = activeTab?.url || '';
     let nextPageKind: typeof pageKind = 'other';
+    if (
+      category === MessengerCategory.Conversations &&
+      destination.matches(nextUrl)
+    ) {
+      setCurrentUrl(nextUrl);
+      setPageKind('specific');
+      return;
+    }
     if (activeTab?.id && nextUrl.includes('facebook.com')) {
       try {
         const activityContext = await chrome.tabs.sendMessage(activeTab.id, {
@@ -179,7 +188,9 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
       if (!isCorrectPage) {
         void refreshPageCheck();
         setMessage(
-          pageKind === 'default'
+          category === MessengerCategory.Conversations
+            ? 'Open a conversation in Messenger before scanning.'
+            : pageKind === 'default'
             ? `You are on Facebook's general Activity Log. Open the specific ${destination.label} category before scanning.`
             : `Open the specific ${destination.label} page first. CleanSlate will not scan this page.`,
         );
@@ -223,7 +234,9 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
             : pageKind === 'default'
               ? 'Facebook default Activity Log page'
               : pageKind === 'other'
-                ? 'Not on the Facebook Activity Log page'
+                ? category === MessengerCategory.Conversations
+                  ? 'No open Messenger conversation detected'
+                  : 'Not on the Facebook Activity Log page'
                 : 'Checking the current page…'}
         </div>
         <div
@@ -238,8 +251,10 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
             : pageKind === 'default'
               ? `Facebook opened the general log. Open the specific ${destination.label} page.`
               : pageKind === 'other'
-                ? `Open the specific ${destination.label} page before scanning.`
-                : 'Waiting for Facebook to finish loading its activity page.'}
+                  ? category === MessengerCategory.Conversations
+                    ? 'Open a conversation in Messenger before scanning.'
+                    : `Open the specific ${destination.label} page before scanning.`
+                  : 'Waiting for Facebook to finish loading its activity page.'}
         </div>
       </div>
 
