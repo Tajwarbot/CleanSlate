@@ -59,15 +59,6 @@ function isReactionsAutomationTarget(): boolean {
   );
 }
 
-async function waitForAutomationTarget(): Promise<boolean> {
-  const deadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
-  while (Date.now() < deadline) {
-    if (isReactionsAutomationTarget()) return true;
-    await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
-  }
-  return false;
-}
-
 async function waitForControl(
   findControl: () => HTMLElement | null,
 ): Promise<HTMLElement | null> {
@@ -78,6 +69,25 @@ async function waitForControl(
     await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
   }
   return null;
+}
+
+async function getStoredNavigation(): Promise<{
+  platform?: string;
+  category?: string;
+  action?: string;
+  mode?: string;
+} | null> {
+  try {
+    const result = await chrome.storage.local.get('cleanslate_navigation');
+    return (result['cleanslate_navigation'] as {
+      platform?: string;
+      category?: string;
+      action?: string;
+      mode?: string;
+    } | undefined) || null;
+  } catch {
+    return null;
+  }
 }
 
 async function waitForActivityItemsToLoad(): Promise<void> {
@@ -133,11 +143,26 @@ function findRemoveAllButton(): HTMLElement | null {
 async function runAutomaticReactionsCleanup(): Promise<void> {
   if (detectPlatform() !== 'facebook') return;
 
-  if (!(await waitForAutomationTarget())) {
+  const storedNavigation = await getStoredNavigation();
+  const isStoredReactionsTarget =
+    (new URL(window.location.href).pathname === '/me/allactivity' ||
+      new URL(window.location.href).pathname === '/me/allactivity/') &&
+    storedNavigation?.platform === 'facebook' &&
+    storedNavigation.category === FacebookCategory.LikesReactions &&
+    storedNavigation.action === 'reactions_cleanup';
+
+  if (!isReactionsAutomationTarget() && !isStoredReactionsTarget) {
     return;
   }
 
-  const mode = getAutomationParameter('cleanslate_mode') || 'preview';
+  if (!isReactionsAutomationTarget()) {
+    const deadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
+    while (Date.now() < deadline && !isReactionsAutomationTarget()) {
+      await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
+    }
+  }
+
+  const mode = getAutomationParameter('cleanslate_mode') || storedNavigation?.mode || 'preview';
   const runKey = `cleanslate:reactions_cleanup:${mode}`;
   if (sessionStorage.getItem(runKey) === window.location.href) return;
 
@@ -146,6 +171,10 @@ async function runAutomaticReactionsCleanup(): Promise<void> {
   });
 
   await waitForActivityItemsToLoad();
+  const scannedItems = await fbAdapter.scanActivity(FacebookCategory.LikesReactions);
+  logger.info('Automatic Likes & Reactions scan completed', {
+    context: { itemsFound: scannedItems.length },
+  });
 
   const selectAll = await waitForControl(findSelectAllCheckbox);
   if (!selectAll) {
@@ -153,6 +182,7 @@ async function runAutomaticReactionsCleanup(): Promise<void> {
     return;
   }
   sessionStorage.setItem(runKey, window.location.href);
+  await chrome.storage.local.remove('cleanslate_navigation');
 
   if (selectAll.getAttribute('aria-checked') !== 'true' && !(selectAll as HTMLInputElement).checked) {
     selectAll.click();

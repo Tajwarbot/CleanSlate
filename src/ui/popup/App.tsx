@@ -11,6 +11,7 @@ import { Header } from './components/Header';
 import { Footer } from './components/Footer';
 import { DashboardPage } from './pages/DashboardPage';
 import { ActivitySelectPage } from './pages/ActivitySelectPage';
+import { MessengerSelectPage } from './pages/MessengerSelectPage';
 import { ScanResultsPage } from './pages/ScanResultsPage';
 import { ConfirmPage } from './pages/ConfirmPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -27,6 +28,7 @@ import type { CleanupItem, OperationStats } from '../../types/operations';
 type Page =
   | 'dashboard'
   | 'activity_select'
+  | 'messenger_select'
   | 'scan_results'
   | 'confirm'
   | 'progress'
@@ -275,10 +277,6 @@ export function App() {
     dispatch({ type: 'SET_PAGE', page: 'settings' });
   }, []);
 
-  const goToActivitySelect = useCallback(() => {
-    dispatch({ type: 'SET_PAGE', page: 'activity_select' });
-  }, []);
-
   const openFacebookActivityLog = useCallback(() => {
     const targetUrl = new URL('https://www.facebook.com/me/allactivity');
     targetUrl.searchParams.set('category_key', 'LIKESANDREACTIONSCLUSTER');
@@ -288,6 +286,14 @@ export function App() {
     targetUrl.hash = `cleanslate_action=reactions_cleanup&cleanslate_mode=${mode}`;
 
     if (typeof chrome !== 'undefined' && chrome.tabs) {
+      void chrome.storage.local.set({
+        cleanslate_navigation: {
+          platform: 'facebook',
+          category: 'likes_reactions',
+          action: 'reactions_cleanup',
+          mode,
+        },
+      });
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
         const activeTab = tabs[0];
         if (activeTab?.id && activeTab.url?.includes('facebook.com')) {
@@ -300,6 +306,32 @@ export function App() {
     }
 
     window.open(targetUrl.toString(), '_blank');
+  }, [state.dryRun]);
+
+  const openMessengerConversations = useCallback(() => {
+    const targetUrl = 'https://www.messenger.com/';
+
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      void chrome.storage.local.set({
+        cleanslate_navigation: {
+          platform: 'messenger',
+          category: 'conversations',
+          action: 'scan',
+          mode: state.dryRun ? 'preview' : 'execute',
+        },
+      });
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs[0];
+        if (activeTab?.id && activeTab.url?.includes('messenger.com')) {
+          chrome.tabs.update(activeTab.id, { url: targetUrl });
+        } else {
+          chrome.tabs.create({ url: targetUrl });
+        }
+      });
+      return;
+    }
+
+    window.open(targetUrl, '_blank');
   }, [state.dryRun]);
 
   const handleScan = useCallback(
@@ -432,11 +464,7 @@ export function App() {
             dryRun={state.dryRun}
             onDryRunToggle={() => dispatch({ type: 'TOGGLE_DRY_RUN' })}
             onFacebookClick={openFacebookActivityLog}
-            onMessengerClick={() => {
-              // Messenger goes straight to scan with 'conversations' category
-              // For now, show the same activity select
-              goToActivitySelect();
-            }}
+            onMessengerClick={() => dispatch({ type: 'SET_PAGE', page: 'messenger_select' })}
             interruptedSession={state.interruptedSession}
             onReviewSession={handleReviewSession}
             onDiscardSession={handleDiscardSession}
@@ -447,6 +475,13 @@ export function App() {
         {state.page === 'activity_select' && (
           <ActivitySelectPage
             onScan={handleScan}
+            onCancel={goToDashboard}
+          />
+        )}
+
+        {state.page === 'messenger_select' && (
+          <MessengerSelectPage
+            onOpenConversations={openMessengerConversations}
             onCancel={goToDashboard}
           />
         )}
