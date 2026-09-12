@@ -46,6 +46,33 @@ export function ScanResultsPage({
     .replace(/_/g, ' ')
     .replace(/\b\w/g, (c) => c.toUpperCase());
 
+  const getActivityLogUrl = (cat: string) => {
+    const c = cat.toLowerCase();
+    if (c.includes('comment')) {
+      return 'https://www.facebook.com/me/allactivity?category_key=COMMENTSCLUSTER';
+    }
+    if (c.includes('like') || c.includes('reaction')) {
+      return 'https://www.facebook.com/me/allactivity?category_key=LIKESANDREACTIONSCLUSTER';
+    }
+    return 'https://www.facebook.com/me/allactivity';
+  };
+
+  const openActivityLog = () => {
+    const targetUrl = getActivityLogUrl(category);
+    if (typeof chrome !== 'undefined' && chrome.tabs) {
+      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
+        const activeTab = tabs[0];
+        if (activeTab?.id && activeTab.url?.includes('facebook.com')) {
+          chrome.tabs.update(activeTab.id, { url: targetUrl });
+        } else {
+          chrome.tabs.create({ url: targetUrl });
+        }
+      });
+    } else {
+      window.open(targetUrl, '_blank');
+    }
+  };
+
   return (
     <div className="cs-page cs-animate-fade-in">
       {/* Header */}
@@ -60,22 +87,16 @@ export function ScanResultsPage({
           <div style={{ fontWeight: 600, color: 'var(--cs-text-primary)', marginBottom: 'var(--cs-space-xs)' }}>
             No {categoryLabel} Found in Current View
           </div>
-          <div style={{ fontSize: 'var(--cs-font-size-sm)', color: 'var(--cs-text-secondary)', lineHeight: 1.5, marginBottom: 'var(--cs-space-md)' }}>
-            Make sure you are on the Facebook Activity Log page where your activity is listed, or scroll down in the page to load older items.
+          <div style={{ fontSize: 'var(--cs-font-size-xs)', color: 'var(--cs-text-secondary)', lineHeight: 1.5, marginBottom: 'var(--cs-space-md)' }}>
+            Please ensure you are on your Facebook Activity Log page for {categoryLabel} and that items have loaded into view.
           </div>
           <button
             type="button"
             className="cs-btn cs-btn--sm cs-btn--primary"
-            style={{ width: '100%' }}
-            onClick={() => {
-              if (typeof chrome !== 'undefined' && chrome.tabs) {
-                chrome.tabs.create({ url: 'https://www.facebook.com/your_information/activity_log' });
-              } else {
-                window.open('https://www.facebook.com/your_information/activity_log', '_blank');
-              }
-            }}
+            style={{ width: '100%', marginBottom: 'var(--cs-space-xs)' }}
+            onClick={openActivityLog}
           >
-            Open Facebook Activity Log
+            Go to {categoryLabel} in Activity Log
           </button>
         </div>
       ) : (

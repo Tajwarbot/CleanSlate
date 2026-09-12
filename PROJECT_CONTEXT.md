@@ -138,6 +138,7 @@ All messages are validated via `src/utils/validation.ts` using typed `ExtensionM
 4. **DOM Selectors Are Fragile**: Facebook/Messenger frequently updates their DOM. The adapters use a layered selector strategy (ARIA → data attributes → structural fallbacks) but selectors may need updating.
 5. **Stable Hook References (`useExtension`)**: The popup `useExtension` hook returns an object of callbacks. It must be wrapped in `useMemo` and the initial load effect in `App.tsx` must only run on mount (`[]`), otherwise React enters an infinite re-render loop blasting Chrome runtime messaging and locking the UI thread.
 6. **Active Operation Coordination**: The service worker coordinates the async execution loop (`handleStartOperation` / `runExecutionLoop`) and broadcasts `OPERATION_PROGRESS` and `OPERATION_COMPLETE` messages to the popup to keep the progress UI reactive.
+7. **Facebook Activity Log URLs & Discovery**: Never use `/your_information/activity_log` (Facebook displays 'Sorry, something went wrong'). The universal redirect URL is `https://www.facebook.com/me/allactivity` (or category-specific `?category_key=COMMENTSCLUSTER`, `?category_key=LIKESANDREACTIONSCLUSTER`). Items in Facebook Activity Log are discovered through language-agnostic 3-dots action buttons, checkboxes, and row containers rather than static feed selectors.
 
 ---
 

@@ -123,53 +123,169 @@ export class LiveFacebookAdapter implements FacebookAdapter {
     return isActivityPage ? CapabilityStatus.Supported : CapabilityStatus.Unavailable;
   }
 
-  async scanActivity(category: ActivityCategory): Promise<ReadonlyArray<CleanupItem>> {
-    logger.info('Scanning Facebook activity items', { context: { category } });
+  /**
+   * Resilient, language-independent discovery of Facebook Activity Log items.
+   * Leverages 3-dots action buttons, checkboxes, and structural DOM inspection.
+   */
+  private findActivityElements(): { row: Element; optionsBtn?: HTMLElement; checkbox?: HTMLElement }[] {
+    const results: { row: Element; optionsBtn?: HTMLElement; checkbox?: HTMLElement }[] = [];
 
-    const items: CleanupItem[] = [];
-    let elements: Element[] = [];
-    const container = this.findFirstElement(SELECTORS.activityLogContainer) || document.body;
+    // Strategy 1: Find by action buttons (3-dots options menu on each activity entry)
+    const candidateButtons: HTMLElement[] = [];
+    const btnSelectors = [
+      'div[role="button"][aria-haspopup="menu"]',
+      'div[role="button"][aria-haspopup="true"]',
+      'div[role="button"][aria-haspopup]',
+      '[aria-haspopup="menu"]',
+      '[aria-label*="Action" i]',
+      '[aria-label*="Option" i]',
+      '[aria-label*="More" i]',
+      '[aria-label*="Edit" i]',
+    ];
 
-    for (const sel of SELECTORS.activityItem) {
+    for (const sel of btnSelectors) {
       try {
-        const found = Array.from(container.querySelectorAll(sel));
-        const meaningful = found.filter((el) => {
-          const text = el.textContent?.trim() || '';
-          return text.length > 5 && !el.closest('header') && !el.closest('nav');
-        });
-        if (meaningful.length > 0) {
-          elements = meaningful;
-          break;
+        const found = Array.from(document.querySelectorAll(sel)) as HTMLElement[];
+        for (const btn of found) {
+          if (btn.closest('header') || btn.closest('nav') || btn.closest('[role="navigation"]')) continue;
+          if (!candidateButtons.includes(btn)) {
+            candidateButtons.push(btn);
+          }
         }
       } catch {
         // Skip
       }
     }
 
-    if (elements.length === 0) {
-      elements = this.findAllElements(SELECTORS.activityItem);
+    // Language-independent check: buttons containing 3-dot SVG circles
+    try {
+      const allDivButtons = Array.from(document.querySelectorAll('div[role="button"]')) as HTMLElement[];
+      for (const btn of allDivButtons) {
+        if (btn.closest('header') || btn.closest('nav') || btn.closest('[role="navigation"]')) continue;
+        if (btn.querySelector('svg circle') && !candidateButtons.includes(btn)) {
+          candidateButtons.push(btn);
+        }
+      }
+    } catch {
+      // Skip
     }
 
-    for (let i = 0; i < elements.length; i++) {
-      const el = elements[i];
-      if (!el) continue;
+    for (const btn of candidateButtons) {
+      let current: HTMLElement | null = btn.parentElement;
+      let rowEl: HTMLElement = btn;
+      while (current && current !== document.body && current.getAttribute('role') !== 'main') {
+        const text = current.textContent?.trim() || '';
+        if (text.length > 8 && text.length < 2500) {
+          rowEl = current;
+          if (current.parentElement && current.parentElement.children.length > 1) {
+            break;
+          }
+        }
+        current = current.parentElement;
+      }
 
-      const textContent = el.textContent || '';
+      if (!results.some((r) => r.row === rowEl)) {
+        results.push({ row: rowEl, optionsBtn: btn });
+      }
+    }
+
+    if (results.length > 0) {
+      console.log(`[CleanSlate] Discovered ${results.length} activity items via action buttons`);
+      return results;
+    }
+
+    // Strategy 2: Find by checkboxes (Facebook Activity Log multi-select view)
+    try {
+      const checkboxes = Array.from(document.querySelectorAll('div[role="checkbox"], input[type="checkbox"]')) as HTMLElement[];
+      for (const cb of checkboxes) {
+        if (cb.closest('header') || cb.closest('nav') || cb.closest('[role="navigation"]')) continue;
+        let current: HTMLElement | null = cb.parentElement;
+        let rowEl: HTMLElement = cb;
+        while (current && current !== document.body && current.getAttribute('role') !== 'main') {
+          const text = current.textContent?.trim() || '';
+          if (text.length > 8 && text.length < 2500) {
+            rowEl = current;
+            if (current.parentElement && current.parentElement.children.length > 1) {
+              break;
+            }
+          }
+          current = current.parentElement;
+        }
+        if (!results.some((r) => r.row === rowEl)) {
+          const btn = rowEl.querySelector('div[role="button"][aria-haspopup], [aria-label*="Action" i]') as HTMLElement | null;
+          results.push({ row: rowEl, optionsBtn: btn || undefined, checkbox: cb });
+        }
+      }
+    } catch {
+      // Skip
+    }
+
+    if (results.length > 0) {
+      console.log(`[CleanSlate] Discovered ${results.length} activity items via checkboxes`);
+      return results;
+    }
+
+    // Strategy 3: Structural container fallback
+    const structuralSelectors = [
+      '[role="row"]',
+      '[role="article"]',
+      '[role="listitem"]',
+      '[data-pagelet*="ActivityLog"]',
+      'div[role="feed"] > div',
+    ];
+
+    for (const sel of structuralSelectors) {
+      try {
+        const found = Array.from(document.querySelectorAll(sel));
+        const meaningful = found.filter((el) => {
+          if (el.closest('header') || el.closest('nav') || el.closest('[role="navigation"]')) return false;
+          const text = el.textContent?.trim() || '';
+          return text.length > 15 && text.length < 3000;
+        });
+        if (meaningful.length > 0) {
+          for (const el of meaningful) {
+            const btn = el.querySelector('div[role="button"][aria-haspopup], [aria-label*="Action" i]') as HTMLElement | null;
+            results.push({ row: el, optionsBtn: btn || undefined });
+          }
+          console.log(`[CleanSlate] Discovered ${results.length} activity items via selector: ${sel}`);
+          return results;
+        }
+      } catch {
+        // Skip
+      }
+    }
+
+    return results;
+  }
+
+  async scanActivity(category: ActivityCategory): Promise<ReadonlyArray<CleanupItem>> {
+    console.log(`[CleanSlate] Scanning Facebook URL: ${window.location.href} for category: ${category}`);
+    logger.info('Scanning Facebook activity items', { context: { category, url: window.location.href } });
+
+    const items: CleanupItem[] = [];
+    const elements = this.findActivityElements();
+
+    for (let i = 0; i < elements.length; i++) {
+      const entry = elements[i];
+      if (!entry) continue;
+
+      const el = entry.row;
+      const textContent = (el.textContent || '').replace(/\s+/g, ' ').trim();
       const ariaLabel = el.getAttribute('aria-label') || '';
-      const labelText = `${ariaLabel} ${textContent}`.trim().substring(0, 120) || `Facebook activity #${i + 1}`;
-      const hasOptionsBtn = Boolean(this.findFirstChild(el, SELECTORS.optionsButton));
+      const labelText = (ariaLabel || textContent).substring(0, 120) || `Facebook activity #${i + 1}`;
 
       items.push({
         id: generateItemId(),
         category,
         label: labelText,
-        description: textContent.trim().substring(0, 200),
+        description: textContent.substring(0, 200),
         timestamp: this.extractTimestamp(el) || Date.now(),
         url: window.location.href,
-        actionable: hasOptionsBtn || true,
+        actionable: true,
       });
     }
 
+    console.log(`[CleanSlate] Scan complete: ${items.length} items found.`);
     logger.info('Scan completed', { context: { category, itemsFound: items.length } });
     return items;
   }
@@ -219,18 +335,22 @@ export class LiveFacebookAdapter implements FacebookAdapter {
     }
 
     try {
-      const rows = this.findAllElements(SELECTORS.activityItem);
+      const detected = this.findActivityElements();
       let targetRow: Element | null = null;
+      let targetOptionsBtn: HTMLElement | null = null;
 
-      for (const row of rows) {
-        if (row && row.textContent?.includes(item.label.substring(0, 30))) {
-          targetRow = row;
+      for (const d of detected) {
+        const text = d.row.textContent || '';
+        if (text.includes(item.label.substring(0, 25)) || item.label.includes(text.substring(0, 25))) {
+          targetRow = d.row;
+          targetOptionsBtn = d.optionsBtn || null;
           break;
         }
       }
 
-      if (!targetRow && rows.length > 0 && rows[0]) {
-        targetRow = rows[0];
+      if (!targetRow && detected.length > 0 && detected[0]) {
+        targetRow = detected[0].row;
+        targetOptionsBtn = detected[0].optionsBtn || null;
       }
 
       if (!targetRow) {
@@ -246,7 +366,10 @@ export class LiveFacebookAdapter implements FacebookAdapter {
       targetRow.scrollIntoView({ behavior: 'smooth', block: 'center' });
       await delayWithJitter(400);
 
-      const optionsBtn = this.findFirstChild(targetRow, SELECTORS.optionsButton) as HTMLElement | null;
+      const optionsBtn =
+        targetOptionsBtn ||
+        (this.findFirstChild(targetRow, SELECTORS.optionsButton) as HTMLElement | null) ||
+        (targetRow.querySelector('div[role="button"]') as HTMLElement | null);
 
       if (!optionsBtn) {
         return {
