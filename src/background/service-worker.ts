@@ -435,15 +435,19 @@ async function runExecutionLoop() {
 // Register message listener
 chrome.runtime.onMessage.addListener(handleMessage);
 
-async function triggerActivityAutomation(tabId: number, url?: string): Promise<void> {
-  if (!url?.includes('facebook.com') || !url.includes('/me/allactivity')) return;
-
+async function triggerActivityAutomation(tabId: number): Promise<void> {
   try {
     const navigation = await chrome.storage.local.get('cleanslate_navigation');
     const intent = navigation['cleanslate_navigation'] as
-      | { platform?: string; action?: string; mode?: string }
+      | { platform?: string; action?: string; mode?: string; tabId?: number }
       | undefined;
-    if (intent?.platform !== 'facebook' || intent.action !== 'reactions_cleanup') return;
+    if (
+      intent?.platform !== 'facebook' ||
+      intent.action !== 'reactions_cleanup' ||
+      (intent.tabId !== undefined && intent.tabId !== tabId)
+    ) {
+      return;
+    }
 
     await chrome.tabs.sendMessage(tabId, {
       type: 'AUTOMATE_REACTIONS_CLEANUP',
@@ -452,14 +456,14 @@ async function triggerActivityAutomation(tabId: number, url?: string): Promise<v
   } catch {
     // Content scripts can take a moment to become available after navigation.
     setTimeout(() => {
-      void triggerActivityAutomation(tabId, url);
+      void triggerActivityAutomation(tabId);
     }, 1500);
   }
 }
 
-chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
-  if (changeInfo.status === 'complete') {
-    void triggerActivityAutomation(tabId, tab.url);
+chrome.tabs.onUpdated.addListener((tabId, changeInfo) => {
+  if (changeInfo.status === 'loading' || changeInfo.status === 'complete' || changeInfo.url) {
+    void triggerActivityAutomation(tabId);
   }
 });
 

@@ -76,6 +76,7 @@ async function getStoredNavigation(): Promise<{
   category?: string;
   action?: string;
   mode?: string;
+  tabId?: number;
 } | null> {
   try {
     const result = await chrome.storage.local.get('cleanslate_navigation');
@@ -84,6 +85,7 @@ async function getStoredNavigation(): Promise<{
       category?: string;
       action?: string;
       mode?: string;
+      tabId?: number;
     } | undefined) || null;
   } catch {
     return null;
@@ -178,26 +180,22 @@ async function runAutomaticReactionsCleanupImpl(
   if (detectPlatform() !== 'facebook') return;
 
   const storedNavigation = await getStoredNavigation();
-  const currentPath = new URL(window.location.href).pathname;
   const isStoredReactionsTarget =
-    currentPath.includes('/me/allactivity') &&
     storedNavigation?.platform === 'facebook' &&
     storedNavigation.category === FacebookCategory.LikesReactions &&
     storedNavigation.action === 'reactions_cleanup';
-
-  if (!currentPath.includes('/me/allactivity')) {
-    return;
-  }
 
   if (!forcedMode && !isReactionsAutomationTarget() && !isStoredReactionsTarget) {
     return;
   }
 
-  if (!forcedMode && !isReactionsAutomationTarget()) {
-    const deadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
-    while (Date.now() < deadline && !isReactionsAutomationTarget()) {
-      await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
-    }
+  const routeDeadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
+  while (!isReactionsAutomationTarget() && Date.now() < routeDeadline) {
+    await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
+  }
+  if (!isReactionsAutomationTarget()) {
+    logger.warn('Automatic cleanup stopped: Facebook Activity Log route was not reached');
+    return;
   }
 
   const mode = forcedMode || getAutomationParameter('cleanslate_mode') || storedNavigation?.mode || 'preview';

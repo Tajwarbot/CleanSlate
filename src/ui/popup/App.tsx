@@ -294,14 +294,23 @@ export function App() {
           mode,
         },
       });
-      chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-        const activeTab = tabs[0];
-        if (activeTab?.id && activeTab.url?.includes('facebook.com')) {
-          chrome.tabs.update(activeTab.id, { url: targetUrl.toString() });
-        } else {
-          chrome.tabs.create({ url: targetUrl.toString() });
-        }
-      });
+      const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+      const activeTab = tabs[0];
+      const targetTab = activeTab?.id && activeTab.url?.includes('facebook.com')
+        ? activeTab
+        : await chrome.tabs.create({ url: targetUrl.toString() });
+      if (targetTab.id) {
+        await chrome.storage.local.set({
+          cleanslate_navigation: {
+            platform: 'facebook',
+            category: 'likes_reactions',
+            action: 'reactions_cleanup',
+            mode,
+            tabId: targetTab.id,
+          },
+        });
+        await chrome.tabs.update(targetTab.id, { url: targetUrl.toString() });
+      }
       return;
     }
 
