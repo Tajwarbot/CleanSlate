@@ -1,0 +1,238 @@
+{
+  "extensionName": {
+    "message": "CleanSlate",
+    "description": "The name of the extension"
+  },
+  "extensionDescription": {
+    "message": "Privacy-first tool for managing and removing your own Facebook and Messenger activity",
+    "description": "The description of the extension"
+  },
+  "dashboardTitle": {
+    "message": "CleanSlate",
+    "description": "Title shown on the main dashboard"
+  },
+  "statusReady": {
+    "message": "Ready",
+    "description": "Status indicator when the extension is ready"
+  },
+  "statusNotDetected": {
+    "message": "Not detected",
+    "description": "Status when the platform is not detected on the current page"
+  },
+  "statusScanning": {
+    "message": "Scanning...",
+    "description": "Status during a scan operation"
+  },
+  "statusProcessing": {
+    "message": "Processing...",
+    "description": "Status during an active cleanup operation"
+  },
+  "statusPaused": {
+    "message": "Paused",
+    "description": "Status when the operation is paused"
+  },
+  "statusError": {
+    "message": "Error",
+    "description": "Status when an error has occurred"
+  },
+  "whatToClean": {
+    "message": "What do you want to clean?",
+    "description": "Prompt asking user what activity to clean"
+  },
+  "activityButton": {
+    "message": "Facebook Activity",
+    "description": "Button to start Facebook activity cleanup"
+  },
+  "messengerButton": {
+    "message": "Messenger",
+    "description": "Button to start Messenger cleanup"
+  },
+  "recentCleanup": {
+    "message": "Recent cleanup",
+    "description": "Header for recent cleanup summary"
+  },
+  "itemsRemoved": {
+    "message": "$COUNT$ items removed",
+    "description": "Summary of items removed in recent cleanup",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "83"
+      }
+    }
+  },
+  "noRecentActivity": {
+    "message": "No recent cleanup activity",
+    "description": "Shown when there is no recent cleanup history"
+  },
+  "categoryLikesReactions": {
+    "message": "Likes & Reactions",
+    "description": "Category name for likes and reactions"
+  },
+  "categoryComments": {
+    "message": "Comments",
+    "description": "Category name for comments"
+  },
+  "categoryPageLikes": {
+    "message": "Page Likes",
+    "description": "Category name for page likes"
+  },
+  "categoryFollows": {
+    "message": "Follows",
+    "description": "Category name for follows"
+  },
+  "categoryOther": {
+    "message": "Other Activity",
+    "description": "Category name for other activity types"
+  },
+  "categoryConversations": {
+    "message": "Conversations",
+    "description": "Category name for messenger conversations"
+  },
+  "scanActivity": {
+    "message": "Scan Activity",
+    "description": "Button to start scanning for activity"
+  },
+  "scanComplete": {
+    "message": "Scan complete",
+    "description": "Header when scan finishes"
+  },
+  "itemsFound": {
+    "message": "$COUNT$ items found",
+    "description": "Number of items found during scan",
+    "placeholders": {
+      "count": {
+        "content": "$1",
+        "example": "1842"
+      }
+    }
+  },
+  "selectAll": {
+    "message": "Select All",
+    "description": "Button to select all items"
+  },
+  "clearSelection": {
+    "message": "Clear Selection",
+    "description": "Button to clear selection"
+  },
+  "continueButton": {
+    "message": "Continue",
+    "description": "Button to continue to the next step"
+  },
+  "cancelButton": {
+    "message": "Cancel",
+    "description": "Button to cancel the current operation"
+  },
+  "confirmCleanup": {
+    "message": "Confirm Cleanup",
+    "description": "Header for the confirmation dialog"
+  },
+  "aboutToRemove": {
+    "message": "You're about to remove:",
+    "description": "Text before the list of items to remove"
+  },
+  "irreversibleWarning": {
+    "message": "Some actions may not be reversible.",
+    "description": "Warning that actions cannot be undone"
+  },
+  "batchWarning": {
+    "message": "CleanSlate will process them in small batches and stop if unexpected behavior is detected.",
+    "description": "Explanation of batch processing"
+  },
+  "startCleanup": {
+    "message": "I Understand — Start Cleanup",
+    "description": "Final confirmation button to begin cleanup"
+  },
+  "pauseButton": {
+    "message": "Pause",
+    "description": "Button to pause the operation"
+  },
+  "resumeButton": {
+    "message": "Resume",
+    "description": "Button to resume a paused operation"
+  },
+  "stopButton": {
+    "message": "STOP",
+    "description": "Emergency stop button"
+  },
+  "processed": {
+    "message": "Processed",
+    "description": "Label for total items processed"
+  },
+  "successfullyRemoved": {
+    "message": "Successfully removed",
+    "description": "Label for successfully removed items"
+  },
+  "skipped": {
+    "message": "Skipped",
+    "description": "Label for skipped items"
+  },
+  "failed": {
+    "message": "Failed",
+    "description": "Label for failed items"
+  },
+  "cleanupComplete": {
+    "message": "Cleanup Complete",
+    "description": "Header when cleanup finishes"
+  },
+  "viewReport": {
+    "message": "View Report",
+    "description": "Button to view detailed cleanup report"
+  },
+  "startAnother": {
+    "message": "Start Another Cleanup",
+    "description": "Button to start a new cleanup"
+  },
+  "dryRunMode": {
+    "message": "Dry Run Mode",
+    "description": "Label for dry run mode toggle"
+  },
+  "dryRunDescription": {
+    "message": "Scan and preview without making any changes",
+    "description": "Description of dry run mode"
+  },
+  "settings": {
+    "message": "Settings",
+    "description": "Settings page title"
+  },
+  "batchSize": {
+    "message": "Batch Size",
+    "description": "Setting for number of items per batch"
+  },
+  "cooldownDelay": {
+    "message": "Cooldown Delay",
+    "description": "Setting for delay between batches"
+  },
+  "securityChallengeTitle": {
+    "message": "Security Challenge Detected",
+    "description": "Title when Facebook shows a security challenge"
+  },
+  "securityChallengeMessage": {
+    "message": "Facebook has presented a security or verification challenge. CleanSlate stopped the operation to protect your account. No attempt will be made to bypass the challenge.",
+    "description": "Message shown when a security challenge is detected"
+  },
+  "okButton": {
+    "message": "OK",
+    "description": "OK button"
+  },
+  "accountSafetyNotice": {
+    "message": "CleanSlate cannot guarantee how Facebook will respond to automated activity. It uses conservative, user-controlled operation and stops when unexpected behavior or security challenges are detected.",
+    "description": "Account safety disclaimer"
+  },
+  "previousCleanupInterrupted": {
+    "message": "Previous cleanup interrupted",
+    "description": "Title when a previous cleanup was interrupted"
+  },
+  "noAutoResume": {
+    "message": "CleanSlate will not resume automatically.",
+    "description": "Notice that cleanup will not auto-resume"
+  },
+  "reviewButton": {
+    "message": "Review",
+    "description": "Button to review interrupted cleanup"
+  },
+  "discardButton": {
+    "message": "Discard",
+    "description": "Button to discard interrupted cleanup"
+  }
+}

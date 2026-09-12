@@ -1,0 +1,432 @@
+/* =================================================================
+   CleanSlate Component Styles
+   ================================================================= */
+
+/* ---- Button ---- */
+.cs-btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: var(--cs-space-sm);
+  padding: var(--cs-space-sm) var(--cs-space-lg);
+  font-family: var(--cs-font-family);
+  font-size: var(--cs-font-size-base);
+  font-weight: 600;
+  line-height: 1.4;
+  color: var(--cs-text-primary);
+  background: var(--cs-bg-elevated);
+  border: 1px solid var(--cs-border-default);
+  border-radius: var(--cs-radius-md);
+  cursor: pointer;
+  transition: all var(--cs-transition-fast);
+  user-select: none;
+  white-space: nowrap;
+  min-height: 36px;
+}
+
+.cs-btn:hover {
+  background: var(--cs-bg-glass-hover);
+  border-color: var(--cs-border-strong);
+  transform: translateY(-1px);
+  box-shadow: var(--cs-shadow-md);
+}
+
+.cs-btn:active {
+  transform: translateY(0);
+  box-shadow: var(--cs-shadow-sm);
+}
+
+.cs-btn:disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+  transform: none;
+  box-shadow: none;
+}
+
+/* Primary Button */
+.cs-btn--primary {
+  background: var(--cs-gradient-primary);
+  border-color: transparent;
+  color: #fff;
+}
+
+.cs-btn--primary:hover {
+  background: var(--cs-gradient-primary);
+  filter: brightness(1.12);
+  border-color: transparent;
+  box-shadow: var(--cs-shadow-glow);
+}
+
+/* Danger Button */
+.cs-btn--danger {
+  background: var(--cs-gradient-danger);
+  border-color: transparent;
+  color: #fff;
+}
+
+.cs-btn--danger:hover {
+  filter: brightness(1.1);
+  border-color: transparent;
+  box-shadow: var(--cs-shadow-glow-danger);
+}
+
+/* Ghost Button */
+.cs-btn--ghost {
+  background: transparent;
+  border-color: transparent;
+  color: var(--cs-text-secondary);
+}
+
+.cs-btn--ghost:hover {
+  background: var(--cs-bg-glass);
+  color: var(--cs-text-primary);
+  border-color: transparent;
+}
+
+/* Full width */
+.cs-btn--full {
+  width: 100%;
+}
+
+/* Small */
+.cs-btn--sm {
+  padding: var(--cs-space-xs) var(--cs-space-md);
+  font-size: var(--cs-font-size-sm);
+  min-height: 30px;
+}
+
+/* Large */
+.cs-btn--lg {
+  padding: var(--cs-space-md) var(--cs-space-xl);
+  font-size: var(--cs-font-size-md);
+  min-height: 42px;
+}
+
+/* ---- Card ---- */
+.cs-card {
+  background: var(--cs-gradient-surface);
+  border: 1px solid var(--cs-border-subtle);
+  border-radius: var(--cs-radius-lg);
+  padding: var(--cs-space-lg);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  transition: all var(--cs-transition-base);
+}
+
+.cs-card:hover {
+  border-color: var(--cs-border-default);
+  box-shadow: var(--cs-shadow-md);
+}
+
+.cs-card--interactive {
+  cursor: pointer;
+}
+
+.cs-card--interactive:hover {
+  border-color: var(--cs-border-accent);
+  box-shadow: var(--cs-shadow-glow);
+  transform: translateY(-2px);
+}
+
+.cs-card--interactive:active {
+  transform: translateY(0);
+}
+
+/* ---- Status Badge ---- */
+.cs-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 3px 10px;
+  font-size: var(--cs-font-size-xs);
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  border-radius: var(--cs-radius-full);
+  border: 1px solid transparent;
+}
+
+.cs-badge__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+
+.cs-badge--ready {
+  background: rgba(16, 185, 129, 0.12);
+  color: var(--cs-success-400);
+  border-color: rgba(16, 185, 129, 0.2);
+}
+
+.cs-badge--ready .cs-badge__dot {
+  background: var(--cs-success-400);
+  box-shadow: 0 0 6px var(--cs-success-400);
+}
+
+.cs-badge--scanning {
+  background: rgba(79, 94, 255, 0.12);
+  color: var(--cs-primary-400);
+  border-color: rgba(79, 94, 255, 0.2);
+}
+
+.cs-badge--scanning .cs-badge__dot {
+  background: var(--cs-primary-400);
+  animation: cs-pulse 1.5s ease-in-out infinite;
+}
+
+.cs-badge--processing {
+  background: rgba(245, 158, 11, 0.12);
+  color: var(--cs-warning-400);
+  border-color: rgba(245, 158, 11, 0.2);
+}
+
+.cs-badge--processing .cs-badge__dot {
+  background: var(--cs-warning-400);
+  animation: cs-pulse 1s ease-in-out infinite;
+}
+
+.cs-badge--error {
+  background: rgba(239, 68, 68, 0.12);
+  color: var(--cs-danger-400);
+  border-color: rgba(239, 68, 68, 0.2);
+}
+
+.cs-badge--error .cs-badge__dot {
+  background: var(--cs-danger-400);
+}
+
+.cs-badge--inactive {
+  background: rgba(100, 116, 139, 0.12);
+  color: var(--cs-gray-400);
+  border-color: rgba(100, 116, 139, 0.2);
+}
+
+.cs-badge--inactive .cs-badge__dot {
+  background: var(--cs-gray-400);
+}
+
+/* ---- Progress Bar ---- */
+.cs-progress {
+  width: 100%;
+  height: 8px;
+  background: var(--cs-bg-tertiary);
+  border-radius: var(--cs-radius-full);
+  overflow: hidden;
+  position: relative;
+}
+
+.cs-progress__fill {
+  height: 100%;
+  background: var(--cs-gradient-primary);
+  border-radius: var(--cs-radius-full);
+  transition: width var(--cs-transition-slow);
+  position: relative;
+  animation: cs-progress-glow 2s ease-in-out infinite;
+}
+
+.cs-progress__fill--success {
+  background: var(--cs-gradient-accent);
+}
+
+.cs-progress__fill--complete {
+  background: linear-gradient(135deg, var(--cs-success-500) 0%, var(--cs-success-400) 100%);
+  animation: none;
+  box-shadow: var(--cs-shadow-glow-success);
+}
+
+/* ---- Checkbox ---- */
+.cs-checkbox {
+  display: flex;
+  align-items: center;
+  gap: var(--cs-space-md);
+  cursor: pointer;
+  padding: var(--cs-space-sm) 0;
+  user-select: none;
+}
+
+.cs-checkbox__input {
+  appearance: none;
+  width: 18px;
+  height: 18px;
+  border: 2px solid var(--cs-border-strong);
+  border-radius: var(--cs-radius-sm);
+  background: transparent;
+  cursor: pointer;
+  transition: all var(--cs-transition-fast);
+  position: relative;
+  flex-shrink: 0;
+}
+
+.cs-checkbox__input:checked {
+  background: var(--cs-primary-500);
+  border-color: var(--cs-primary-500);
+}
+
+.cs-checkbox__input:checked::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 5px;
+  width: 5px;
+  height: 9px;
+  border: solid #fff;
+  border-width: 0 2px 2px 0;
+  transform: rotate(45deg);
+}
+
+.cs-checkbox__input:focus-visible {
+  outline: 2px solid var(--cs-primary-400);
+  outline-offset: 2px;
+}
+
+.cs-checkbox__label {
+  font-size: var(--cs-font-size-md);
+  color: var(--cs-text-primary);
+}
+
+/* ---- Divider ---- */
+.cs-divider {
+  width: 100%;
+  height: 1px;
+  background: var(--cs-border-subtle);
+  margin: var(--cs-space-lg) 0;
+}
+
+/* ---- Stats Grid ---- */
+.cs-stats {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--cs-space-sm);
+}
+
+.cs-stat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: var(--cs-space-sm) var(--cs-space-md);
+  background: var(--cs-bg-tertiary);
+  border-radius: var(--cs-radius-md);
+  border: 1px solid var(--cs-border-subtle);
+}
+
+.cs-stat__label {
+  font-size: var(--cs-font-size-xs);
+  color: var(--cs-text-tertiary);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.cs-stat__value {
+  font-size: var(--cs-font-size-lg);
+  font-weight: 700;
+  color: var(--cs-text-primary);
+}
+
+.cs-stat__value--success {
+  color: var(--cs-success-400);
+}
+
+.cs-stat__value--warning {
+  color: var(--cs-warning-400);
+}
+
+.cs-stat__value--danger {
+  color: var(--cs-danger-400);
+}
+
+/* ---- Warning Box ---- */
+.cs-warning {
+  display: flex;
+  gap: var(--cs-space-md);
+  padding: var(--cs-space-md) var(--cs-space-lg);
+  background: rgba(245, 158, 11, 0.08);
+  border: 1px solid rgba(245, 158, 11, 0.2);
+  border-radius: var(--cs-radius-md);
+  color: var(--cs-warning-400);
+  font-size: var(--cs-font-size-sm);
+  line-height: 1.5;
+}
+
+.cs-warning--danger {
+  background: rgba(239, 68, 68, 0.08);
+  border-color: rgba(239, 68, 68, 0.2);
+  color: var(--cs-danger-400);
+}
+
+.cs-warning__icon {
+  flex-shrink: 0;
+  font-size: var(--cs-font-size-lg);
+}
+
+/* ---- Security Alert ---- */
+.cs-security-alert {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: var(--cs-space-lg);
+  padding: var(--cs-space-2xl);
+  background: rgba(239, 68, 68, 0.06);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--cs-radius-lg);
+}
+
+.cs-security-alert__icon {
+  font-size: 2.5rem;
+}
+
+.cs-security-alert__title {
+  font-size: var(--cs-font-size-lg);
+  font-weight: 700;
+  color: var(--cs-danger-400);
+}
+
+.cs-security-alert__message {
+  font-size: var(--cs-font-size-base);
+  color: var(--cs-text-secondary);
+  line-height: 1.6;
+  max-width: 280px;
+}
+
+/* ---- Toggle Switch ---- */
+.cs-toggle {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  cursor: pointer;
+}
+
+.cs-toggle__input {
+  appearance: none;
+  width: 40px;
+  height: 22px;
+  background: var(--cs-bg-tertiary);
+  border: 2px solid var(--cs-border-default);
+  border-radius: var(--cs-radius-full);
+  cursor: pointer;
+  transition: all var(--cs-transition-fast);
+  position: relative;
+}
+
+.cs-toggle__input::after {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 14px;
+  height: 14px;
+  background: var(--cs-gray-400);
+  border-radius: 50%;
+  transition: all var(--cs-transition-fast);
+}
+
+.cs-toggle__input:checked {
+  background: var(--cs-primary-500);
+  border-color: var(--cs-primary-500);
+}
+
+.cs-toggle__input:checked::after {
+  background: #fff;
+  transform: translateX(18px);
+}
