@@ -23,7 +23,6 @@ import { useExtension, type ProgressUpdate } from './hooks/useExtension';
 import { OperationState } from '../../types/state';
 import {
   DEFAULT_SETTINGS,
-  FacebookCategory,
   MessengerCategory,
   type ActivityCategory,
   type CleanSlateSettings,
@@ -429,7 +428,7 @@ export function App() {
             platform={state.platform}
             dryRun={state.dryRun}
             onDryRunToggle={() => dispatch({ type: 'TOGGLE_DRY_RUN' })}
-            onFacebookClick={() => beginGuidedCleanup(FacebookCategory.LikesReactions)}
+            onFacebookClick={() => dispatch({ type: 'SET_PAGE', page: 'activity_select' })}
             onMessengerClick={() => dispatch({ type: 'SET_PAGE', page: 'messenger_select' })}
             interruptedSession={state.interruptedSession}
             onReviewSession={handleReviewSession}

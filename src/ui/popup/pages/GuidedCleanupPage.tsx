@@ -32,9 +32,22 @@ function getDestination(category: ActivityCategory): { label: string; url: strin
   return {
     label: category.replace(/_/g, ' '),
     url: url.toString(),
-    matches: (currentUrl) =>
-      currentUrl.includes('facebook.com/me/allactivity') &&
-      (!categoryKey || currentUrl.toUpperCase().includes(categoryKey)),
+    matches: (currentUrl) => {
+      try {
+        const current = new URL(currentUrl);
+        if (!current.hostname.endsWith('facebook.com')) return false;
+
+        const isActivityLog =
+          current.pathname.includes('/me/allactivity') ||
+          (current.pathname === '/profile.php' &&
+            current.searchParams.get('sk')?.toLowerCase() === 'allactivity');
+        const currentCategory = current.searchParams.get('category_key')?.toUpperCase();
+
+        return isActivityLog && (!categoryKey || currentCategory === categoryKey);
+      } catch {
+        return false;
+      }
+    },
   };
 }
 
