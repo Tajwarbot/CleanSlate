@@ -172,29 +172,35 @@ function findRemoveAllButton(): HTMLElement | null {
 
 let reactionsAutomationRunning = false;
 
-async function runAutomaticReactionsCleanupImpl(): Promise<void> {
+async function runAutomaticReactionsCleanupImpl(
+  forcedMode?: string,
+): Promise<void> {
   if (detectPlatform() !== 'facebook') return;
 
   const storedNavigation = await getStoredNavigation();
+  const currentPath = new URL(window.location.href).pathname;
   const isStoredReactionsTarget =
-    (new URL(window.location.href).pathname === '/me/allactivity' ||
-      new URL(window.location.href).pathname === '/me/allactivity/') &&
+    currentPath.includes('/me/allactivity') &&
     storedNavigation?.platform === 'facebook' &&
     storedNavigation.category === FacebookCategory.LikesReactions &&
     storedNavigation.action === 'reactions_cleanup';
 
-  if (!isReactionsAutomationTarget() && !isStoredReactionsTarget) {
+  if (!currentPath.includes('/me/allactivity')) {
     return;
   }
 
-  if (!isReactionsAutomationTarget()) {
+  if (!forcedMode && !isReactionsAutomationTarget() && !isStoredReactionsTarget) {
+    return;
+  }
+
+  if (!forcedMode && !isReactionsAutomationTarget()) {
     const deadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
     while (Date.now() < deadline && !isReactionsAutomationTarget()) {
       await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
     }
   }
 
-  const mode = getAutomationParameter('cleanslate_mode') || storedNavigation?.mode || 'preview';
+  const mode = forcedMode || getAutomationParameter('cleanslate_mode') || storedNavigation?.mode || 'preview';
   const runKey = `cleanslate:reactions_cleanup:${mode}`;
   if (sessionStorage.getItem(runKey) === window.location.href) return;
 
@@ -236,11 +242,11 @@ async function runAutomaticReactionsCleanupImpl(): Promise<void> {
   logger.info('Automatic Likes & Reactions removal requested');
 }
 
-async function runAutomaticReactionsCleanup(): Promise<void> {
+async function runAutomaticReactionsCleanup(forcedMode?: string): Promise<void> {
   if (reactionsAutomationRunning) return;
   reactionsAutomationRunning = true;
   try {
-    await runAutomaticReactionsCleanupImpl();
+    await runAutomaticReactionsCleanupImpl(forcedMode);
   } finally {
     reactionsAutomationRunning = false;
   }
@@ -328,6 +334,12 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
         status: 'success',
         verification,
       };
+    }
+
+    case 'AUTOMATE_REACTIONS_CLEANUP': {
+      const mode = typeof msg['mode'] === 'string' ? msg['mode'] : undefined;
+      void runAutomaticReactionsCleanup(mode);
+      return { status: 'started' };
     }
 
     default:

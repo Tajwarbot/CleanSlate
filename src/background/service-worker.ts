@@ -435,6 +435,34 @@ async function runExecutionLoop() {
 // Register message listener
 chrome.runtime.onMessage.addListener(handleMessage);
 
+async function triggerActivityAutomation(tabId: number, url?: string): Promise<void> {
+  if (!url?.includes('facebook.com') || !url.includes('/me/allactivity')) return;
+
+  try {
+    const navigation = await chrome.storage.local.get('cleanslate_navigation');
+    const intent = navigation['cleanslate_navigation'] as
+      | { platform?: string; action?: string; mode?: string }
+      | undefined;
+    if (intent?.platform !== 'facebook' || intent.action !== 'reactions_cleanup') return;
+
+    await chrome.tabs.sendMessage(tabId, {
+      type: 'AUTOMATE_REACTIONS_CLEANUP',
+      mode: intent.mode || 'preview',
+    });
+  } catch {
+    // Content scripts can take a moment to become available after navigation.
+    setTimeout(() => {
+      void triggerActivityAutomation(tabId, url);
+    }, 1500);
+  }
+}
+
+chrome.tabs.onUpdated.addListener((tabId, changeInfo, tab) => {
+  if (changeInfo.status === 'complete') {
+    void triggerActivityAutomation(tabId, tab.url);
+  }
+});
+
 // Service worker lifecycle
 chrome.runtime.onInstalled.addListener((details) => {
   logger.info('CleanSlate installed', {
