@@ -32,6 +32,11 @@ const CATEGORIES = [
     name: 'Follows',
     description: 'Unfollow people and pages',
   },
+  {
+    value: FacebookCategory.Posts,
+    name: 'Posts',
+    description: 'Manage your posts, photos, and videos',
+  },
 ] as const;
 
 export function ActivitySelectPage({ onScan, onCancel }: ActivitySelectPageProps) {

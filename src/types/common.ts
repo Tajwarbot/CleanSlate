@@ -21,6 +21,7 @@ export enum FacebookCategory {
   Comments = 'comments',
   PageLikes = 'page_likes',
   Follows = 'follows',
+  Posts = 'posts',
   Other = 'other',
 }
 
@@ -99,6 +100,7 @@ export const DEFAULT_SETTINGS: CleanSlateSettings = {
     FacebookCategory.Comments,
     FacebookCategory.PageLikes,
     FacebookCategory.Follows,
+    FacebookCategory.Posts,
   ],
   theme: 'system',
 };

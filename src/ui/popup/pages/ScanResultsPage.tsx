@@ -52,7 +52,10 @@ export function ScanResultsPage({
       return 'https://www.facebook.com/me/allactivity?category_key=COMMENTSCLUSTER';
     }
     if (c.includes('like') || c.includes('reaction')) {
-      return 'https://www.facebook.com/me/allactivity?category_key=LIKESANDREACTIONSCLUSTER';
+      return 'https://www.facebook.com/me/allactivity?activity_history=false&category_key=LIKEDPOSTS&manage_mode=false&should_load_landing_page=false';
+    }
+    if (c.includes('post')) {
+      return 'https://www.facebook.com/me/allactivity?activity_history=false&category_key=MANAGEPOSTSPHOTOSANDVIDEOS&manage_mode=false&should_load_landing_page=false';
     }
     return 'https://www.facebook.com/me/allactivity';
   };

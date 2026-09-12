@@ -54,7 +54,7 @@ function isReactionsAutomationTarget(): boolean {
   const url = new URL(window.location.href);
   return (
     url.pathname.includes('/me/allactivity') &&
-    url.searchParams.get('category_key')?.toUpperCase() === 'LIKESANDREACTIONSCLUSTER' &&
+    url.searchParams.get('category_key')?.toUpperCase() === 'LIKEDPOSTS' &&
     getAutomationParameter('cleanslate_action') === 'reactions_cleanup'
   );
 }

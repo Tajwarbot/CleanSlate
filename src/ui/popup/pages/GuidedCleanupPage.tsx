@@ -22,12 +22,17 @@ function getDestination(category: ActivityCategory): { label: string; url: strin
 
   const categoryKey =
     category === FacebookCategory.LikesReactions
-      ? 'LIKESANDREACTIONSCLUSTER'
+      ? 'LIKEDPOSTS'
       : category === FacebookCategory.Comments
         ? 'COMMENTSCLUSTER'
-        : '';
+        : category === FacebookCategory.Posts
+          ? 'MANAGEPOSTSPHOTOSANDVIDEOS'
+          : '';
   const url = new URL('https://www.facebook.com/me/allactivity');
+  url.searchParams.set('activity_history', 'false');
   if (categoryKey) url.searchParams.set('category_key', categoryKey);
+  url.searchParams.set('manage_mode', 'false');
+  url.searchParams.set('should_load_landing_page', 'false');
 
   return {
     label: category.replace(/_/g, ' '),
