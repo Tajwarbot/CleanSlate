@@ -32,7 +32,7 @@
 | **Packaging** | `scripts/package.mjs` | ✅ Complete | Creates `cleanslate-v0.1.0.zip` via PowerShell `Compress-Archive` |
 | **Facebook DOM Adapter** | `src/adapters/facebook-adapter.ts` | ✅ Complete | Live DOM activity scanning, action execution, modal confirmation, verification |
 | **Messenger DOM Adapter** | `src/adapters/messenger-adapter.ts` | ✅ Complete | Live conversation discovery, chat deletion, confirmation handling, verification |
-| **Content Script Wiring** | `src/content/index.ts` | ✅ Complete | Injected script connecting DOM adapters to Service Worker messaging |
+| **Content Script Wiring** | `src/content/index.ts` | ✅ Complete | Injected script connecting DOM adapters to Service Worker messaging plus Activity Log automation |
 
 ---
 
@@ -139,6 +139,8 @@ All messages are validated via `src/utils/validation.ts` using typed `ExtensionM
 5. **Stable Hook References (`useExtension`)**: The popup `useExtension` hook returns an object of callbacks. It must be wrapped in `useMemo` and the initial load effect in `App.tsx` must only run on mount (`[]`), otherwise React enters an infinite re-render loop blasting Chrome runtime messaging and locking the UI thread.
 6. **Active Operation Coordination**: The service worker coordinates the async execution loop (`handleStartOperation` / `runExecutionLoop`) and broadcasts `OPERATION_PROGRESS` and `OPERATION_COMPLETE` messages to the popup to keep the progress UI reactive.
 7. **Facebook Activity Log URLs & Discovery**: Never use `/your_information/activity_log` (Facebook displays 'Sorry, something went wrong'). The universal redirect URL is `https://www.facebook.com/me/allactivity` (or category-specific `?category_key=COMMENTSCLUSTER`, `?category_key=LIKESANDREACTIONSCLUSTER`). Items in Facebook Activity Log are discovered through language-agnostic 3-dots action buttons, checkboxes, and row containers rather than static feed selectors.
+8. **Automatic Likes & Reactions Workflow**: The dashboard's Facebook Activity button opens `https://www.facebook.com/me/allactivity?category_key=LIKESANDREACTIONSCLUSTER` with CleanSlate control parameters. The content script then waits for lazy-loaded entries by scrolling to the bottom until the document height stabilizes, returns to the top, selects the Activity Log `All` checkbox, and clicks `Remove` only when the URL mode is `execute`. Dry-run mode uses `preview` and never clicks `Remove`.
+9. **Automation Guardrails**: Activity Log automation is opt-in through the `cleanslate_action=reactions_cleanup` URL parameter, runs once per matching page/mode using `sessionStorage`, checks visible accessible controls, and stops with a warning if the select-all or remove control cannot be confidently located.
 
 ---
 
