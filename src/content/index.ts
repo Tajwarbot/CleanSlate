@@ -591,6 +591,11 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
       return result;
     }
 
+    case 'MESSENGER_CLEANUP': {
+      const dryRun = msg['dryRun'] === true;
+      return msgerAdapter.cleanupOpenConversation(dryRun);
+    }
+
     case 'EXECUTE_ITEM': {
       const item = msg['item'] as CleanupItem;
       if (!item) {

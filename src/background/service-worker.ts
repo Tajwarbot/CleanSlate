@@ -6,7 +6,7 @@
  */
 
 import { MessageType, MessageSource, generateMessageId, type ExtensionMessage } from '../types/messages';
-import type { ActivityCategory } from '../types/common';
+import { MessengerCategory, type ActivityCategory } from '../types/common';
 import type { CleanupItem, OperationStats } from '../types/operations';
 import { OperationState } from '../types/state';
 import { validateIncomingMessage, isAuthorizedMessage } from '../utils/validation';
@@ -331,7 +331,70 @@ async function handleStartOperation(
 
     sendResponse({ acknowledged: true });
 
-    if (message.category !== 'conversations') {
+    const messengerOperation = activeOperation;
+    if (message.category === MessengerCategory.Conversations && messengerOperation) {
+      try {
+        const result = (await chrome.tabs.sendMessage(tabId, {
+          type: 'MESSENGER_CLEANUP',
+          dryRun: message.dryRun,
+        })) as {
+          processed?: number;
+          successful?: number;
+          failed?: number;
+        };
+        messengerOperation.stats = {
+          ...messengerOperation.stats,
+          processedItems: result?.processed ?? total,
+          successCount: result?.successful ?? 0,
+          failedCount: result?.failed ?? 0,
+          elapsedMs: Date.now() - startTime,
+        };
+        chrome.runtime
+          .sendMessage({
+            type: MessageType.OperationProgress,
+            source: MessageSource.ServiceWorker,
+            timestamp: Date.now(),
+            id: generateMessageId(),
+            stats: { ...messengerOperation.stats },
+          })
+          .catch(() => {});
+        chrome.runtime
+          .sendMessage({
+            type: MessageType.OperationComplete,
+            source: MessageSource.ServiceWorker,
+            timestamp: Date.now(),
+            id: generateMessageId(),
+            report: {
+              operationId: message.operationId,
+              category: message.category,
+              stats: { ...messengerOperation.stats },
+              results: [],
+              verifications: [],
+              startedAt: startTime,
+              completedAt: Date.now(),
+              durationMs: Date.now() - startTime,
+              stoppedByUser: false,
+              stoppedBySafety: false,
+              dryRun: message.dryRun,
+            },
+          })
+          .catch(() => {});
+        activeOperation = null;
+        return;
+      } catch {
+        messengerOperation.stats = {
+          ...messengerOperation.stats,
+          processedItems: total,
+          successCount: 0,
+          failedCount: total,
+          elapsedMs: Date.now() - startTime,
+        };
+        activeOperation = null;
+        return;
+      }
+    }
+
+    if (message.category !== MessengerCategory.Conversations) {
       try {
         const result = (await chrome.tabs.sendMessage(tabId, {
           type: 'BULK_CLEANUP',

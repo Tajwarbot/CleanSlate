@@ -81,6 +81,66 @@ const SELECTORS = {
 export class LiveMessengerAdapter implements MessengerAdapter {
   private messageTargets = new Map<string, Element>();
 
+  async cleanupOpenConversation(dryRun: boolean): Promise<{
+    processed: number;
+    successful: number;
+    failed: number;
+  }> {
+    const main = document.querySelector('main, [role="main"]');
+    if (!main) return { processed: 0, successful: 0, failed: 0 };
+
+    await this.loadOlderMessages(main);
+    let successful = 0;
+    let failed = 0;
+    let stablePasses = 0;
+
+    for (let pass = 0; pass < 120 && stablePasses < 5; pass++) {
+      const rows = this.getMessageRows(main).reverse();
+      if (rows.length === 0) break;
+
+      let changed = false;
+      for (const row of rows) {
+        if (this.isUnsentPlaceholder(row)) continue;
+        const item: CleanupItem = {
+          id: generateItemId(),
+          category: MessengerCategory.Conversations,
+          label: this.messageLabel(row),
+          description: 'Message in the currently open conversation',
+          timestamp: Date.now(),
+          url: window.location.href,
+          actionable: true,
+        };
+        this.messageTargets.set(item.id, row);
+
+        if (dryRun) {
+          successful++;
+          continue;
+        }
+
+        const result = await this.execute(item);
+        if (result.status === ActionStatus.Success) {
+          successful++;
+          changed = true;
+        } else {
+          failed++;
+        }
+        await delayWithJitter(1800);
+      }
+
+      const beforeCount = rows.length;
+      await this.loadOlderMessages(main);
+      const afterCount = this.getMessageRows(main).length;
+      stablePasses = changed || afterCount !== beforeCount ? 0 : stablePasses + 1;
+      if (dryRun) break;
+    }
+
+    return {
+      processed: successful + failed,
+      successful,
+      failed,
+    };
+  }
+
   async detectCapabilities(): Promise<DetectedCapabilities> {
     const isMessenger =
       window.location.hostname.includes('messenger.com') ||
@@ -140,11 +200,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
 
         await this.loadOlderMessages(main);
 
-        const elements = this.findAllElements(SELECTORS.messageItem).filter((element) => {
-          if (!main.contains(element)) return false;
-          if (element.closest('[role="navigation"], [role="grid"], [aria-label="Chats"]')) return false;
-          return Boolean((element.textContent || '').trim());
-        });
+        const elements = this.getMessageRows(main);
 
       this.messageTargets.clear();
       return elements.map((element, index) => {
@@ -354,6 +410,22 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       element.textContent ||
       ''
     ).replace(/\s+/g, ' ').trim();
+  }
+
+  private getMessageRows(main: Element): Element[] {
+    return this.findAllElements(SELECTORS.messageItem).filter((element) => {
+      if (!main.contains(element)) return false;
+      if (element.closest('[role="navigation"], [aria-label="Chats"]')) return false;
+      return Boolean((element.textContent || '').trim()) && !this.isUnsentPlaceholder(element);
+    });
+  }
+
+  private messageLabel(element: Element): string {
+    return (element.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 160) || 'Message';
+  }
+
+  private isUnsentPlaceholder(element: Element): boolean {
+    return this.getAccessibleText(element) === 'You unsent a message';
   }
 
   private findMessageOptionsButton(message: Element): HTMLElement | null {
