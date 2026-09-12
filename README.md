@@ -2,6 +2,8 @@
 
 CleanSlate is a privacy-first browser extension for reviewing and removing your own Facebook and Messenger activity. It works locally in your browser and uses the controls rendered by Facebook rather than an external Facebook API.
 
+The extension icon uses the supplied CleanSlate erasing-mark artwork and is generated at all required browser sizes during packaging.
+
 ## Install from GitHub (recommended)
 
 You do not need Node.js or programming knowledge to install a published package.
