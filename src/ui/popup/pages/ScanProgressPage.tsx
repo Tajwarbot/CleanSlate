@@ -4,6 +4,7 @@ interface ScanProgressPageProps {
   loadedItems: number;
   onStopLoading: () => void;
   onContinueLoading: () => void;
+  onCancelScan: () => void;
 }
 
 export function ScanProgressPage({
@@ -12,6 +13,7 @@ export function ScanProgressPage({
   loadedItems,
   onStopLoading,
   onContinueLoading,
+  onCancelScan,
 }: ScanProgressPageProps) {
   return (
     <div className="cs-page cs-animate-fade-in">
@@ -56,6 +58,13 @@ export function ScanProgressPage({
           onClick={onContinueLoading}
         >
           Continue loading to the end
+        </button>
+        <button
+          type="button"
+          className="cs-btn cs-btn--ghost cs-btn--full"
+          onClick={onCancelScan}
+        >
+          Cancel scan and return to dashboard
         </button>
       </div>
       <div className="cs-settings__label-desc">

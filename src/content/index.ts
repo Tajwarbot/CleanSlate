@@ -117,9 +117,9 @@ async function getStoredNavigation(): Promise<{
   }
 }
 
-async function isScanStopRequested(): Promise<boolean> {
+async function getScanControlAction(): Promise<string | undefined> {
   const result = await chrome.storage.local.get('cleanslate_scan_control');
-  return (result['cleanslate_scan_control'] as { action?: string } | undefined)?.action === 'stop';
+  return (result['cleanslate_scan_control'] as { action?: string } | undefined)?.action;
 }
 
 async function waitForActivityItemsToLoad(category?: ActivityCategory): Promise<boolean> {
@@ -148,7 +148,12 @@ async function waitForActivityItemsToLoad(category?: ActivityCategory): Promise<
     i < AUTOMATION_MAX_SCROLLS && stableContentCount < AUTOMATION_STABLE_PASSES_TO_FINISH;
     i++
   ) {
-    if (await isScanStopRequested()) {
+    const controlAction = await getScanControlAction();
+    if (controlAction === 'cancel') {
+      await chrome.storage.local.remove('cleanslate_scan_progress');
+      return false;
+    }
+    if (controlAction === 'stop') {
       await writeProgress(
         'Stopped at current batch',
         'Loading stopped. The activity currently rendered on Facebook is ready to review.',
@@ -553,7 +558,11 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
         items = await msgerAdapter.discoverConversations();
       } else {
         await selectRenderedCategory(category);
-        await waitForActivityItemsToLoad(category);
+        const loadingCompleted = await waitForActivityItemsToLoad(category);
+        const controlAction = await getScanControlAction();
+        if (!loadingCompleted && controlAction === 'cancel') {
+          return { status: 'cancelled', items: [] };
+        }
         items = await fbAdapter.scanActivity(category);
       }
 

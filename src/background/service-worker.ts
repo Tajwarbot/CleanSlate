@@ -258,6 +258,7 @@ async function handleStartScan(
 
     const items = response?.items || [];
     sendResponse({
+      status: response?.status || 'success',
       items,
       preview: {
         category,

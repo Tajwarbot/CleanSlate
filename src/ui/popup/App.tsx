@@ -391,7 +391,14 @@ export function App() {
   // ---- Event handlers ----
 
   const goToDashboard = useCallback(() => {
-    void chrome.storage.local.remove('cleanslate_guided_category');
+    void chrome.storage.local
+      .set({ cleanslate_scan_control: { action: 'cancel', updatedAt: Date.now() } })
+      .then(() =>
+        chrome.storage.local.remove([
+          'cleanslate_guided_category',
+          'cleanslate_scan_progress',
+        ]),
+      );
     dispatch({ type: 'RESET' });
   }, []);
 
@@ -438,7 +445,13 @@ export function App() {
         const result = (await ext.startScan(category, state.dryRun)) as {
           items?: CleanupItem[];
           error?: string;
+          status?: string;
         };
+
+        if (result?.status === 'cancelled') {
+          dispatch({ type: 'RESET' });
+          return;
+        }
 
         if (result?.error) {
           dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Idle });
@@ -474,6 +487,14 @@ export function App() {
     await chrome.storage.local.set({
       cleanslate_scan_control: { action: 'continue', updatedAt: Date.now() },
     });
+  }, []);
+
+  const handleCancelScan = useCallback(async () => {
+    await chrome.storage.local.set({
+      cleanslate_scan_control: { action: 'stop', updatedAt: Date.now() },
+    });
+    await chrome.storage.local.remove('cleanslate_scan_progress');
+    dispatch({ type: 'RESET' });
   }, []);
 
   const handleSelectItems = useCallback(
@@ -610,6 +631,7 @@ export function App() {
             loadedItems={state.scanProgress.loadedItems}
             onStopLoading={handleStopLoading}
             onContinueLoading={handleContinueLoading}
+            onCancelScan={handleCancelScan}
           />
         )}
 
