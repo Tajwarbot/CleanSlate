@@ -36,7 +36,6 @@ export function CompletePage({
     },
   ];
 
-  const icon = dryRun ? '🔒' : stoppedByUser ? '⏹' : '✅';
   const title = dryRun
     ? 'Dry Run Complete'
     : stoppedByUser
@@ -44,9 +43,10 @@ export function CompletePage({
       : 'Cleanup Complete';
 
   return (
-    <div className="cs-page cs-animate-scale-in">
-      <div className="cs-complete__icon">{icon}</div>
-      <div className="cs-complete__title">{title}</div>
+    <div className="cs-page">
+      <div className="cs-complete__title" style={{ marginTop: 'var(--cs-space-md)' }}>
+        {title}
+      </div>
 
       <StatsGrid stats={gridStats} />
 

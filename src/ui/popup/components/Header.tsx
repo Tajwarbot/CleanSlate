@@ -18,29 +18,26 @@ export function Header({ onSettingsClick, onBackClick, showBack }: HeaderProps) 
         {showBack && (
           <button
             id="header-back-btn"
-            className="cs-header__icon-btn"
+            className="cs-header__back-btn"
             onClick={onBackClick}
             aria-label="Go back"
             type="button"
           >
-            ←
+            ← Back
           </button>
         )}
-        <div className="cs-header__logo" aria-hidden="true">
-          🧹
-        </div>
         <h1 className="cs-header__title">CleanSlate</h1>
       </div>
       <div className="cs-header__actions">
         {onSettingsClick && (
           <button
             id="header-settings-btn"
-            className="cs-header__icon-btn"
+            className="cs-header__settings-btn"
             onClick={onSettingsClick}
             aria-label="Settings"
             type="button"
           >
-            ⚙
+            Settings
           </button>
         )}
       </div>

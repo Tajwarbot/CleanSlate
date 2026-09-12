@@ -57,7 +57,6 @@ export function ScanResultsPage({
 
       {items.length === 0 ? (
         <div className="cs-card" style={{ padding: 'var(--cs-space-lg)', textAlign: 'center', margin: 'var(--cs-space-md) 0' }}>
-          <div style={{ fontSize: '24px', marginBottom: 'var(--cs-space-sm)' }}>🔍</div>
           <div style={{ fontWeight: 600, color: 'var(--cs-text-primary)', marginBottom: 'var(--cs-space-xs)' }}>
             No {categoryLabel} Found in Current View
           </div>
@@ -76,7 +75,7 @@ export function ScanResultsPage({
               }
             }}
           >
-            Open Facebook Activity Log ↗
+            Open Facebook Activity Log
           </button>
         </div>
       ) : (

@@ -40,22 +40,22 @@ export function ConfirmPage({
           style={{
             textAlign: 'center',
             marginBottom: 'var(--cs-space-lg)',
-            color: 'var(--cs-primary-400)',
+            color: 'var(--cs-text-primary)',
             fontWeight: 600,
           }}
         >
-          🔒 Dry Run — no changes will be made
+          [DRY RUN] No actual deletions will occur.
         </div>
       )}
 
-      <WarningBox icon="⚠️">
+      <WarningBox>
         Some actions may not be reversible.
       </WarningBox>
 
       <div style={{ height: 'var(--cs-space-sm)' }} />
 
-      <WarningBox icon="ℹ️">
-        CleanSlate will process them in small batches and stop if unexpected behavior is
+      <WarningBox>
+        CleanSlate will process items in small batches and stop if unexpected behavior is
         detected.
       </WarningBox>
 

@@ -20,8 +20,8 @@ export function WarningBox({ children, variant = 'warning', icon }: WarningBoxPr
 
   return (
     <div className={className} role="alert">
-      <span className="cs-warning__icon" aria-hidden="true">
-        {icon ?? (variant === 'danger' ? '🛑' : '⚠️')}
+      <span className="cs-warning__prefix">
+        {icon ? `${icon} ` : variant === 'danger' ? '[WARNING] ' : '[NOTICE] '}
       </span>
       <span>{children}</span>
     </div>

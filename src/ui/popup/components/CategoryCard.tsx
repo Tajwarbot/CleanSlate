@@ -3,7 +3,7 @@
  */
 
 interface CategoryCardProps {
-  icon: string;
+  icon?: string;
   name: string;
   description: string;
   selected?: boolean;
@@ -34,9 +34,11 @@ export function CategoryCard({
       type="button"
       aria-pressed={selected}
     >
-      <div className="cs-category-card__icon" aria-hidden="true">
-        {icon}
-      </div>
+      {icon && (
+        <div className="cs-category-card__icon" aria-hidden="true">
+          {icon}
+        </div>
+      )}
       <div className="cs-category-card__info">
         <div className="cs-category-card__name">{name}</div>
         <div className="cs-category-card__desc">{description}</div>

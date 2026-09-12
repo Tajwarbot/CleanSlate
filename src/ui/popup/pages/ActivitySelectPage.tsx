@@ -14,25 +14,21 @@ interface ActivitySelectPageProps {
 const CATEGORIES = [
   {
     value: FacebookCategory.LikesReactions,
-    icon: '👍',
     name: 'Likes & Reactions',
     description: 'Unlike posts and remove reactions',
   },
   {
     value: FacebookCategory.Comments,
-    icon: '💬',
     name: 'Comments',
     description: 'Delete your comments on posts',
   },
   {
     value: FacebookCategory.PageLikes,
-    icon: '📄',
     name: 'Page Likes',
     description: 'Unlike pages you have liked',
   },
   {
     value: FacebookCategory.Follows,
-    icon: '👤',
     name: 'Follows',
     description: 'Unfollow people and pages',
   },
@@ -50,7 +46,6 @@ export function ActivitySelectPage({ onScan, onCancel }: ActivitySelectPageProps
           <CategoryCard
             key={cat.value}
             id={`category-${cat.value}`}
-            icon={cat.icon}
             name={cat.name}
             description={cat.description}
             selected={selected === cat.value}

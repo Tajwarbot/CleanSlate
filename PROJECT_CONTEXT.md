@@ -141,6 +141,14 @@ All messages are validated via `src/utils/validation.ts` using typed `ExtensionM
 
 ---
 
+## 🎨 UI Design System
+
+- **Monochrome Palette**: High-contrast, minimal black and white aesthetic.
+- **Zero Emojis**: Plain text indicators, clean labels, and standard text prefixes (`[NOTICE]`, `[WARNING]`, `[DRY RUN]`).
+- **Clean Layout**: No radial gradients, glow effects, or decorative drop shadows. Snappy and lightweight rendering.
+
+---
+
 ## 📋 NPM Scripts Reference
 
 | Script | Command | Description |

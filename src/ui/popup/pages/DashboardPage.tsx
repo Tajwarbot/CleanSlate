@@ -146,14 +146,12 @@ export function DashboardPage({
       <div className="cs-dashboard__actions">
         <CategoryCard
           id="facebook-activity-btn"
-          icon="📋"
           name="Facebook Activity"
           description="Likes, comments, page likes, follows"
           onClick={onFacebookClick}
         />
         <CategoryCard
           id="messenger-btn"
-          icon="💬"
           name="Messenger"
           description="Delete conversations"
           onClick={onMessengerClick}
