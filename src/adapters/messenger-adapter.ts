@@ -86,7 +86,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     successful: number;
     failed: number;
   }> {
-    const main = document.querySelector('main, [role="main"]');
+    const main = this.findConversationRoot();
     if (!main) return { processed: 0, successful: 0, failed: 0 };
 
     await this.loadOlderMessages(main);
@@ -195,7 +195,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     async discoverMessagesInOpenConversation(): Promise<ReadonlyArray<CleanupItem>> {
       logger.info('Discovering messages in the currently open Messenger conversation');
 
-      const main = document.querySelector('main, [role="main"]');
+      const main = this.findConversationRoot();
       if (!main) return [];
 
         await this.loadOlderMessages(main);
@@ -413,11 +413,37 @@ export class LiveMessengerAdapter implements MessengerAdapter {
   }
 
   private getMessageRows(main: Element): Element[] {
-    return this.findAllElements(SELECTORS.messageItem).filter((element) => {
+    const candidates = SELECTORS.messageItem.flatMap((selector) => {
+      try {
+        return Array.from(document.querySelectorAll(selector));
+      } catch {
+        return [];
+      }
+    });
+    return [...new Set(candidates)].filter((element) => {
       if (!main.contains(element)) return false;
       if (element.closest('[role="navigation"], [aria-label="Chats"]')) return false;
       return Boolean((element.textContent || '').trim()) && !this.isUnsentPlaceholder(element);
     });
+  }
+
+  private findConversationRoot(): Element | null {
+    const candidates = Array.from(document.querySelectorAll('main, [role="main"]'));
+    const ranked = candidates
+      .map((candidate) => ({ candidate, count: this.countMessageRows(candidate) }))
+      .filter(({ count }) => count > 0)
+      .sort((a, b) => b.count - a.count);
+    return ranked[0]?.candidate || null;
+  }
+
+  private countMessageRows(root: Element): number {
+    return SELECTORS.messageItem.reduce((count, selector) => {
+      try {
+        return count + root.querySelectorAll(selector).length;
+      } catch {
+        return count;
+      }
+    }, 0);
   }
 
   private messageLabel(element: Element): string {
@@ -487,7 +513,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
   }
 
   private findMessageScrollContainer(main: Element): HTMLElement | null {
-    const grid = main.querySelector('[role="grid"]') || document.querySelector('[role="grid"]');
+    const grid = main.querySelector('[role="grid"]');
     if (grid) {
       let current = grid.firstElementChild;
       while (current) {
@@ -504,7 +530,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       }
     }
 
-    const row = this.findFirstElement(SELECTORS.messageItem);
+    const row = this.getMessageRows(main)[0] || null;
     let current: Element | null = row;
     while (current) {
       if (current instanceof HTMLElement) {
