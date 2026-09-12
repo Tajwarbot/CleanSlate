@@ -147,7 +147,7 @@ export function DashboardPage({
         <CategoryCard
           id="facebook-activity-btn"
           name="Facebook Activity"
-          description="Likes, comments, page likes, follows"
+          description="Likes, comments, and page likes"
           onClick={onFacebookClick}
         />
         <CategoryCard

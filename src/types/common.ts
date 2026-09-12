@@ -99,7 +99,6 @@ export const DEFAULT_SETTINGS: CleanSlateSettings = {
     FacebookCategory.LikesReactions,
     FacebookCategory.Comments,
     FacebookCategory.PageLikes,
-    FacebookCategory.Follows,
     FacebookCategory.Posts,
   ],
   theme: 'system',

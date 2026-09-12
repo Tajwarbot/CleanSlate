@@ -28,11 +28,6 @@ const CATEGORIES = [
     description: 'Unlike pages you have liked',
   },
   {
-    value: FacebookCategory.Follows,
-    name: 'Follows',
-    description: 'Remove follows from Activity Log',
-  },
-  {
     value: FacebookCategory.Posts,
     name: 'Posts',
     description: 'Manage your posts, photos, and videos',
