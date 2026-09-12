@@ -11,7 +11,42 @@ interface GuidedCleanupPageProps {
   onCancel: () => void;
 }
 
-function getDestination(category: ActivityCategory): { label: string; url: string; matches: (url: string) => boolean } {
+function getCategoryKey(category: ActivityCategory): string {
+  return category === FacebookCategory.LikesReactions
+    ? 'LIKEDPOSTS'
+    : category === FacebookCategory.Comments
+      ? 'COMMENTSCLUSTER'
+      : category === FacebookCategory.Posts
+        ? 'MANAGEPOSTSPHOTOSANDVIDEOS'
+        : '';
+}
+
+function getFacebookProfileId(currentUrl: string): string | null {
+  try {
+    const url = new URL(currentUrl);
+    const queryId = url.searchParams.get('id');
+    if (queryId && /^\d+$/.test(queryId)) return queryId;
+
+    const profilePath = url.pathname.match(/^\/(\d+)\/(?:allactivity)?/);
+    return profilePath?.[1] || null;
+  } catch {
+    return null;
+  }
+}
+
+function buildFacebookActivityUrl(category: ActivityCategory, profileId: string | null): string {
+  const categoryKey = getCategoryKey(category);
+  const target = new URL(
+    `https://www.facebook.com/${profileId || 'me'}/allactivity`,
+  );
+  target.searchParams.set('activity_history', 'false');
+  target.searchParams.set('category_key', categoryKey);
+  target.searchParams.set('manage_mode', 'false');
+  target.searchParams.set('should_load_landing_page', 'false');
+  return target.toString();
+}
+
+function getDestination(category: ActivityCategory, profileId: string | null): { label: string; url: string; matches: (url: string) => boolean } {
   if (category === MessengerCategory.Conversations) {
     return {
       label: 'Messenger conversations',
@@ -20,19 +55,7 @@ function getDestination(category: ActivityCategory): { label: string; url: strin
     };
   }
 
-  const categoryKey =
-    category === FacebookCategory.LikesReactions
-      ? 'LIKEDPOSTS'
-      : category === FacebookCategory.Comments
-        ? 'COMMENTSCLUSTER'
-        : category === FacebookCategory.Posts
-          ? 'MANAGEPOSTSPHOTOSANDVIDEOS'
-          : '';
-  const url = new URL('https://www.facebook.com/me/allactivity');
-  url.searchParams.set('activity_history', 'false');
-  if (categoryKey) url.searchParams.set('category_key', categoryKey);
-  url.searchParams.set('manage_mode', 'false');
-  url.searchParams.set('should_load_landing_page', 'false');
+  const url = buildFacebookActivityUrl(category, profileId);
 
   return {
     label: category.replace(/_/g, ' '),
@@ -44,6 +67,7 @@ function getDestination(category: ActivityCategory): { label: string; url: strin
 
         const isActivityLog =
           current.pathname.includes('/me/allactivity') ||
+          /^\/\d+\/allactivity/.test(current.pathname) ||
           (current.pathname === '/profile.php' &&
             current.searchParams.get('sk')?.toLowerCase() === 'allactivity');
         // Facebook may strip or rewrite category_key after loading the Activity
@@ -57,9 +81,13 @@ function getDestination(category: ActivityCategory): { label: string; url: strin
 }
 
 export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanupPageProps) {
-  const destination = useMemo(() => getDestination(category), [category]);
   const [currentUrl, setCurrentUrl] = useState('');
   const [message, setMessage] = useState('');
+  const profileId = getFacebookProfileId(currentUrl);
+  const destination = useMemo(
+    () => getDestination(category, profileId),
+    [category, profileId],
+  );
 
   const refreshPageCheck = () => {
     chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
@@ -73,15 +101,20 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
 
   const isCorrectPage = destination.matches(currentUrl);
 
-  const openDestination = () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      const activeTab = tabs[0];
-      if (activeTab?.id) {
-        chrome.tabs.update(activeTab.id, { url: destination.url });
-      } else {
-        chrome.tabs.create({ url: destination.url });
-      }
-    });
+  const openDestination = async () => {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+    const targetProfileId = getFacebookProfileId(activeTab?.url || '') || profileId;
+    const targetUrl =
+      category === MessengerCategory.Conversations
+        ? destination.url
+        : buildFacebookActivityUrl(category, targetProfileId);
+
+    if (activeTab?.id) {
+      await chrome.tabs.update(activeTab.id, { url: targetUrl });
+    } else {
+      await chrome.tabs.create({ url: targetUrl });
+    }
   };
 
   const verifyAndStart = () => {
