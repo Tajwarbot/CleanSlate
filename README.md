@@ -18,7 +18,7 @@ You do not need Node.js or programming knowledge to install a published package.
    - Edge: `edge://extensions`
 5. Turn on **Developer mode**.
 6. Click **Load unpacked**.
-7. Select the extracted CleanSlate folder—the folder containing `manifest.json`.
+7. Select the extracted CleanSlate folder—the folder containing `manifest.json`. (dist)
 8. Pin CleanSlate to the browser toolbar, then open Facebook or Messenger and click the extension icon.
 
 Browsers do not allow a ZIP file to be installed directly as an unpacked extension, which is why it must be extracted first. Keep the extracted folder in place while using CleanSlate.
