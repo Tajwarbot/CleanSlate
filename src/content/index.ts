@@ -172,6 +172,58 @@ function findRemoveAllButton(): HTMLElement | null {
   ) || null;
 }
 
+function categorySearchTerms(category: ActivityCategory): string[] {
+  switch (category) {
+    case FacebookCategory.LikesReactions:
+      return ['likes and reactions', 'likes & reactions', 'liked posts'];
+    case FacebookCategory.Comments:
+      return ['comments'];
+    case FacebookCategory.Posts:
+      return ['posts', 'photos and videos', 'posts, photos and videos'];
+    case FacebookCategory.PageLikes:
+      return ['page likes'];
+    case FacebookCategory.Follows:
+      return ['follows', 'following'];
+    default:
+      return [];
+  }
+}
+
+function findCategoryControl(category: ActivityCategory): HTMLElement | null {
+  const terms = categorySearchTerms(category);
+  const controls = Array.from(
+    document.querySelectorAll<HTMLElement>(
+      'a, button, [role="button"], [role="link"], [role="tab"], [role="menuitem"]',
+    ),
+  );
+
+  return (
+    controls.find((control) => {
+      if (!isVisible(control)) return false;
+      const text = getElementText(control);
+      return terms.some((term) => text === term || text.includes(term));
+    }) || null
+  );
+}
+
+async function selectRenderedCategory(category: ActivityCategory): Promise<void> {
+  if (category === MessengerCategory.Conversations) return;
+
+  const control = await waitForControl(() => findCategoryControl(category));
+  if (!control) {
+    logger.warn('Activity category control was not found; continuing with URL-selected view', {
+      context: { category },
+    });
+    return;
+  }
+
+  const currentState = control.getAttribute('aria-current') || control.getAttribute('aria-selected');
+  if (currentState === 'page' || currentState === 'true') return;
+
+  control.click();
+  await new Promise((resolve) => setTimeout(resolve, AUTOMATION_SETTLE_DELAY_MS));
+}
+
 let reactionsAutomationRunning = false;
 
 async function runAutomaticReactionsCleanupImpl(
@@ -285,6 +337,7 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
       if (platform === 'messenger' || category === MessengerCategory.Conversations) {
         items = await msgerAdapter.discoverConversations();
       } else {
+        await selectRenderedCategory(category);
         await waitForActivityItemsToLoad();
         items = await fbAdapter.scanActivity(category);
       }
