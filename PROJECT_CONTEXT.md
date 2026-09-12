@@ -34,17 +34,12 @@
 
 ---
 
-## 🚀 Easy Non-Technical Multi-Browser Setup
-
-Supports **Brave**, **Google Chrome**, and **Microsoft Edge**:
+## 🚀 Direct 1-Click Installation & Launch
 
 ### Option 1: Double-Click `install.bat` (Windows)
-Double-clicking `install.bat` automatically detects installed browsers on your PC (Brave, Chrome, Edge) and lets you launch directly using your **Main Logged-In Profile** so your Facebook/Messenger session is preserved!
+Double-clicking `install.bat` runs `scripts/install-direct.ps1`, which automatically builds CleanSlate and launches Brave / Chrome / Edge with the extension pre-installed.
 
-### Option 2: Terminal Command
+### Option 2: Terminal One-Liner
 ```powershell
 npm start
 ```
-
-### Option 3: Manual Load via File Explorer
-`npm run launch` can also open the `dist/` directory in File Explorer and open `brave://extensions` (or `chrome://extensions`) for 1-click drag & drop installation into any Chromium browser.

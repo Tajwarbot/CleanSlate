@@ -36,3 +36,4 @@ coverage/
 
 # Local dev profile
 .dev-profile/
+.cleanslate-profile/

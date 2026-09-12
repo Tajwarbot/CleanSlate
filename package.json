@@ -19,8 +19,8 @@
     "test:e2e": "echo \"E2E tests will be configured in Phase 8\" && exit 0",
     "audit": "npm audit",
     "package": "npm run build && node scripts/package.mjs",
-    "launch": "node scripts/launch.mjs",
-    "start": "node scripts/launch.mjs",
+    "launch": "pwsh -ExecutionPolicy Bypass -File scripts/install-direct.ps1",
+    "start": "pwsh -ExecutionPolicy Bypass -File scripts/install-direct.ps1",
     "clean": "rimraf dist"
   },
   "dependencies": {

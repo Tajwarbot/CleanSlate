@@ -1,13 +1,7 @@
 @echo off
-title CleanSlate - Extension Launcher & Setup
+title CleanSlate Extension Launcher
 cls
-echo ====================================================
-echo           CleanSlate Extension Launcher
-echo ====================================================
-echo.
-
-node scripts/launch.mjs
-
+powershell -ExecutionPolicy Bypass -File "%~dp0scripts\install-direct.ps1"
 if %ERRORLEVEL% NEQ 0 (
     echo.
     echo Press any key to exit.
