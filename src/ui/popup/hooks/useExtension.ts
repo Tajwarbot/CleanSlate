@@ -6,7 +6,7 @@
  * service worker.
  */
 
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { MessageType, MessageSource, type ExtensionMessage } from '../../../types/messages';
 import type { ActivityCategory, CleanSlateSettings } from '../../../types/common';
 import type { OperationStats } from '../../../types/operations';
@@ -194,17 +194,32 @@ export function useExtension(options: UseExtensionOptions = {}) {
     [],
   );
 
-  return {
-    getState,
-    getSettings,
-    updateSettings,
-    detectCapabilities,
-    startScan,
-    startOperation,
-    pauseOperation,
-    resumeOperation,
-    stopOperation,
-    getInterruptedSession,
-    discardSession,
-  };
+  return useMemo(
+    () => ({
+      getState,
+      getSettings,
+      updateSettings,
+      detectCapabilities,
+      startScan,
+      startOperation,
+      pauseOperation,
+      resumeOperation,
+      stopOperation,
+      getInterruptedSession,
+      discardSession,
+    }),
+    [
+      getState,
+      getSettings,
+      updateSettings,
+      detectCapabilities,
+      startScan,
+      startOperation,
+      pauseOperation,
+      resumeOperation,
+      stopOperation,
+      getInterruptedSession,
+      discardSession,
+    ],
+  );
 }

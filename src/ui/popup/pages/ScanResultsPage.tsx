@@ -55,86 +55,116 @@ export function ScanResultsPage({
         <div className="cs-results__subtitle">{categoryLabel} items found</div>
       </div>
 
-      {/* Selection controls */}
-      <div className="cs-results__selection-actions">
-        <button
-          id="select-all-btn"
-          className="cs-btn cs-btn--sm cs-btn--ghost"
-          onClick={selectAll}
-          type="button"
-        >
-          Select All
-        </button>
-        <button
-          id="clear-selection-btn"
-          className="cs-btn cs-btn--sm cs-btn--ghost"
-          onClick={clearAll}
-          type="button"
-        >
-          Clear Selection
-        </button>
-        <span
-          style={{
-            marginLeft: 'auto',
-            fontSize: 'var(--cs-font-size-sm)',
-            color: 'var(--cs-text-tertiary)',
-            alignSelf: 'center',
-          }}
-        >
-          {selectedIds.size} selected
-        </span>
-      </div>
-
-      {/* Item list */}
-      <div
-        className="cs-results__breakdown"
-        style={{ maxHeight: '200px', overflowY: 'auto' }}
-      >
-        {items.map((item) => (
-          <label key={item.id} className="cs-checkbox" htmlFor={`item-${item.id}`}>
-            <input
-              id={`item-${item.id}`}
-              type="checkbox"
-              className="cs-checkbox__input"
-              checked={selectedIds.has(item.id)}
-              onChange={() => toggleItem(item.id)}
-            />
-            <span className="cs-checkbox__label">
-              <span>{item.label}</span>
-              {item.description && (
-                <span
-                  style={{
-                    display: 'block',
-                    fontSize: 'var(--cs-font-size-xs)',
-                    color: 'var(--cs-text-tertiary)',
-                  }}
-                >
-                  {item.description}
-                </span>
-              )}
+      {items.length === 0 ? (
+        <div className="cs-card" style={{ padding: 'var(--cs-space-lg)', textAlign: 'center', margin: 'var(--cs-space-md) 0' }}>
+          <div style={{ fontSize: '24px', marginBottom: 'var(--cs-space-sm)' }}>🔍</div>
+          <div style={{ fontWeight: 600, color: 'var(--cs-text-primary)', marginBottom: 'var(--cs-space-xs)' }}>
+            No {categoryLabel} Found in Current View
+          </div>
+          <div style={{ fontSize: 'var(--cs-font-size-sm)', color: 'var(--cs-text-secondary)', lineHeight: 1.5, marginBottom: 'var(--cs-space-md)' }}>
+            Make sure you are on the Facebook Activity Log page where your activity is listed, or scroll down in the page to load older items.
+          </div>
+          <button
+            type="button"
+            className="cs-btn cs-btn--sm cs-btn--primary"
+            style={{ width: '100%' }}
+            onClick={() => {
+              if (typeof chrome !== 'undefined' && chrome.tabs) {
+                chrome.tabs.create({ url: 'https://www.facebook.com/your_information/activity_log' });
+              } else {
+                window.open('https://www.facebook.com/your_information/activity_log', '_blank');
+              }
+            }}
+          >
+            Open Facebook Activity Log ↗
+          </button>
+        </div>
+      ) : (
+        <>
+          {/* Selection controls */}
+          <div className="cs-results__selection-actions">
+            <button
+              id="select-all-btn"
+              className="cs-btn cs-btn--sm cs-btn--ghost"
+              onClick={selectAll}
+              type="button"
+            >
+              Select All
+            </button>
+            <button
+              id="clear-selection-btn"
+              className="cs-btn cs-btn--sm cs-btn--ghost"
+              onClick={clearAll}
+              type="button"
+            >
+              Clear Selection
+            </button>
+            <span
+              style={{
+                marginLeft: 'auto',
+                fontSize: 'var(--cs-font-size-sm)',
+                color: 'var(--cs-text-tertiary)',
+                alignSelf: 'center',
+              }}
+            >
+              {selectedIds.size} selected
             </span>
-          </label>
-        ))}
-      </div>
+          </div>
+
+          {/* Item list */}
+          <div
+            className="cs-results__breakdown"
+            style={{ maxHeight: '200px', overflowY: 'auto' }}
+          >
+            {items.map((item) => (
+              <label key={item.id} className="cs-checkbox" htmlFor={`item-${item.id}`}>
+                <input
+                  id={`item-${item.id}`}
+                  type="checkbox"
+                  className="cs-checkbox__input"
+                  checked={selectedIds.has(item.id)}
+                  onChange={() => toggleItem(item.id)}
+                />
+                <span className="cs-checkbox__label">
+                  <span>{item.label}</span>
+                  {item.description && (
+                    <span
+                      style={{
+                        display: 'block',
+                        fontSize: 'var(--cs-font-size-xs)',
+                        color: 'var(--cs-text-tertiary)',
+                      }}
+                    >
+                      {item.description}
+                    </span>
+                  )}
+                </span>
+              </label>
+            ))}
+          </div>
+        </>
+      )}
 
       {/* Actions */}
       <div style={{ display: 'flex', flexDirection: 'column', gap: 'var(--cs-space-sm)' }}>
-        <button
-          id="results-continue-btn"
-          className="cs-btn cs-btn--primary cs-btn--full cs-btn--lg"
-          disabled={selectedIds.size === 0}
-          onClick={() => onContinue([...selectedItems])}
-          type="button"
-        >
-          Continue ({selectedIds.size})
-        </button>
+        {items.length > 0 && (
+          <button
+            id="results-continue-btn"
+            className="cs-btn cs-btn--primary cs-btn--full cs-btn--lg"
+            disabled={selectedIds.size === 0}
+            onClick={() => onContinue([...selectedItems])}
+            type="button"
+          >
+            Continue ({selectedIds.size})
+          </button>
+        )}
         <button
           id="results-cancel-btn"
-          className="cs-btn cs-btn--ghost cs-btn--full"
+          className={`cs-btn cs-btn--full ${items.length === 0 ? 'cs-btn--primary' : 'cs-btn--ghost'}`}
           onClick={onCancel}
           type="button"
         >
-          Cancel
+          {items.length === 0 ? 'Back to Dashboard' : 'Cancel'}
         </button>
       </div>
     </div>

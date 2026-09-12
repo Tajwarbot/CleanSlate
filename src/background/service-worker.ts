@@ -5,8 +5,10 @@
  * Validates all incoming messages. Never trusts webpage data as instructions.
  */
 
-import { MessageType, type ExtensionMessage } from '../types/messages';
+import { MessageType, MessageSource, generateMessageId, type ExtensionMessage } from '../types/messages';
 import type { ActivityCategory } from '../types/common';
+import type { CleanupItem, OperationStats } from '../types/operations';
+import { OperationState } from '../types/state';
 import { validateIncomingMessage, isAuthorizedMessage } from '../utils/validation';
 import { logger } from '../core/logging/logger';
 
@@ -67,7 +69,14 @@ function routeMessage(
 
   switch (message.type) {
     case MessageType.GetState:
-      sendResponse({ state: 'IDLE' });
+      if (activeOperation) {
+        sendResponse({
+          state: activeOperation.paused ? OperationState.Paused : OperationState.Executing,
+          stats: activeOperation.stats,
+        });
+      } else {
+        sendResponse({ state: OperationState.Idle });
+      }
       break;
 
     case MessageType.GetSettings:
@@ -83,9 +92,35 @@ function routeMessage(
       break;
 
     case MessageType.StartOperation:
+      handleStartOperation(
+        message as unknown as {
+          operationId: string;
+          category: ActivityCategory;
+          items: CleanupItem[];
+          dryRun: boolean;
+        },
+        sendResponse,
+      );
+      break;
+
     case MessageType.PauseOperation:
+      if (activeOperation) {
+        activeOperation.paused = true;
+      }
+      sendResponse({ acknowledged: true });
+      break;
+
     case MessageType.ResumeOperation:
+      if (activeOperation) {
+        activeOperation.paused = false;
+      }
+      sendResponse({ acknowledged: true });
+      break;
+
     case MessageType.StopOperation:
+      if (activeOperation) {
+        activeOperation.stopped = true;
+      }
       sendResponse({ acknowledged: true });
       break;
 
@@ -201,6 +236,167 @@ async function handleStartScan(
   } catch (err) {
     sendResponse({ items: [], error: err instanceof Error ? err.message : 'Scan request failed' });
   }
+}
+
+interface ActiveOpState {
+  operationId: string;
+  category: ActivityCategory;
+  items: CleanupItem[];
+  dryRun: boolean;
+  paused: boolean;
+  stopped: boolean;
+  tabId: number;
+  stats: OperationStats;
+}
+
+let activeOperation: ActiveOpState | null = null;
+
+async function handleStartOperation(
+  message: {
+    operationId: string;
+    category: ActivityCategory;
+    items: CleanupItem[];
+    dryRun: boolean;
+  },
+  sendResponse: (response: unknown) => void,
+) {
+  try {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+    const tabId = activeTab?.id ?? -1;
+
+    const items = message.items || [];
+    const total = items.length;
+    const startTime = Date.now();
+
+    const initialStats: OperationStats = {
+      operationId: message.operationId,
+      category: message.category,
+      totalItems: total,
+      processedItems: 0,
+      successCount: 0,
+      failedCount: 0,
+      skippedCount: 0,
+      unknownCount: 0,
+      currentBatch: total > 0 ? 1 : 0,
+      totalBatches: Math.max(1, Math.ceil(total / 5)),
+      startedAt: startTime,
+      elapsedMs: 0,
+    };
+
+    activeOperation = {
+      operationId: message.operationId,
+      category: message.category,
+      items,
+      dryRun: Boolean(message.dryRun),
+      paused: false,
+      stopped: false,
+      tabId,
+      stats: { ...initialStats },
+    };
+
+    sendResponse({ acknowledged: true });
+
+    void runExecutionLoop();
+  } catch (err) {
+    sendResponse({ error: err instanceof Error ? err.message : 'Failed to start operation' });
+  }
+}
+
+async function runExecutionLoop() {
+  if (!activeOperation) return;
+
+  const op = activeOperation;
+  const items = op.items;
+  let successCount = 0;
+  let failedCount = 0;
+
+  for (let i = 0; i < items.length; i++) {
+    if (op.stopped) {
+      break;
+    }
+
+    while (op.paused && !op.stopped) {
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+
+    if (op.stopped) {
+      break;
+    }
+
+    const item = items[i];
+    if (!item) continue;
+
+    if (op.dryRun) {
+      // Realistic simulation pacing in dry-run mode
+      await new Promise((resolve) => setTimeout(resolve, 500));
+      successCount++;
+    } else {
+      try {
+        const res = (await chrome.tabs.sendMessage(op.tabId, {
+          type: 'EXECUTE_ITEM',
+          item,
+        })) as { status?: string };
+
+        if (res?.status === 'success') {
+          successCount++;
+        } else {
+          failedCount++;
+        }
+      } catch {
+        failedCount++;
+      }
+      await new Promise((resolve) => setTimeout(resolve, 800));
+    }
+
+    const processed = i + 1;
+    op.stats = {
+      ...op.stats,
+      processedItems: processed,
+      successCount,
+      failedCount,
+      currentBatch: Math.ceil(processed / 5),
+      elapsedMs: Date.now() - op.stats.startedAt,
+    };
+
+    // Emit progress to popup
+    chrome.runtime
+      .sendMessage({
+        type: MessageType.OperationProgress,
+        source: MessageSource.ServiceWorker,
+        timestamp: Date.now(),
+        id: generateMessageId(),
+        stats: { ...op.stats },
+      })
+      .catch(() => {
+        // Popup may not be open or listening
+      });
+  }
+
+  // Complete operation notification
+  chrome.runtime
+    .sendMessage({
+      type: MessageType.OperationComplete,
+      source: MessageSource.ServiceWorker,
+      timestamp: Date.now(),
+      id: generateMessageId(),
+      report: {
+        operationId: op.operationId,
+        category: op.category,
+        stats: { ...op.stats },
+        results: [],
+        verifications: [],
+        startedAt: op.stats.startedAt,
+        completedAt: Date.now(),
+        durationMs: Date.now() - op.stats.startedAt,
+        stoppedByUser: op.stopped,
+        stoppedBySafety: false,
+        dryRun: op.dryRun,
+      },
+    })
+    .catch(() => {});
+
+  activeOperation = null;
 }
 
 // Register message listener

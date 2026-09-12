@@ -247,7 +247,7 @@ export function App() {
       }
     }
     void init();
-  }, [ext]);
+  }, []); // Run once on mount to prevent infinite re-render loops
 
   // ---- Event handlers ----
 
@@ -267,17 +267,30 @@ export function App() {
     async (category: ActivityCategory) => {
       dispatch({ type: 'SET_CATEGORY', category });
       dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Scanning });
-      dispatch({ type: 'SET_PAGE', page: 'dashboard' }); // Show scanning status
 
       try {
-        const result = await ext.startScan(category, state.dryRun);
-        const items = (result.items ?? []) as CleanupItem[];
+        const result = (await ext.startScan(category, state.dryRun)) as {
+          items?: CleanupItem[];
+          error?: string;
+        };
+
+        if (result?.error) {
+          dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Idle });
+          dispatch({ type: 'SET_ERROR', errorType: 'unknown', message: result.error });
+          return;
+        }
+
+        const items = (result?.items ?? []) as CleanupItem[];
         dispatch({ type: 'SET_DISCOVERED_ITEMS', items });
         dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.PreviewReady });
         dispatch({ type: 'SET_PAGE', page: 'scan_results' });
-      } catch {
+      } catch (err) {
         dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Idle });
-        dispatch({ type: 'SET_ERROR', errorType: 'unknown', message: 'Scan failed. Please try again.' });
+        dispatch({
+          type: 'SET_ERROR',
+          errorType: 'unknown',
+          message: err instanceof Error ? err.message : 'Scan failed. Please try again.',
+        });
       }
     },
     [ext, state.dryRun],

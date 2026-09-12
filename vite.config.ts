@@ -1,3 +1,4 @@
+/// <reference types="vitest" />
 import { defineConfig, build as viteBuild } from 'vite';
 import react from '@vitejs/plugin-react';
 import { resolve } from 'path';
@@ -113,5 +114,10 @@ export default defineConfig({
   },
   define: {
     'process.env.NODE_ENV': JSON.stringify(process.env.NODE_ENV || 'production'),
+  },
+  test: {
+    include: ['tests/**/*.{test,spec}.{ts,tsx}', 'src/**/*.{test,spec}.{ts,tsx}'],
+    exclude: ['**/node_modules/**', '**/dist/**', '**/.dev-profile/**'],
+    passWithNoTests: true,
   },
 });

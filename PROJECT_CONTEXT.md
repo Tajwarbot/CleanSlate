@@ -136,6 +136,8 @@ All messages are validated via `src/utils/validation.ts` using typed `ExtensionM
 2. **`scripting` Permission Required**: The service worker uses `chrome.scripting.executeScript()` as a fallback when the content script isn't already injected. The `scripting` permission must be in `manifest.json`.
 3. **No Silent Extension Install**: Chromium prevents silent installation of local extensions. Users must manually confirm "Load Unpacked" once per profile.
 4. **DOM Selectors Are Fragile**: Facebook/Messenger frequently updates their DOM. The adapters use a layered selector strategy (ARIA → data attributes → structural fallbacks) but selectors may need updating.
+5. **Stable Hook References (`useExtension`)**: The popup `useExtension` hook returns an object of callbacks. It must be wrapped in `useMemo` and the initial load effect in `App.tsx` must only run on mount (`[]`), otherwise React enters an infinite re-render loop blasting Chrome runtime messaging and locking the UI thread.
+6. **Active Operation Coordination**: The service worker coordinates the async execution loop (`handleStartOperation` / `runExecutionLoop`) and broadcasts `OPERATION_PROGRESS` and `OPERATION_COMPLETE` messages to the popup to keep the progress UI reactive.
 
 ---
 

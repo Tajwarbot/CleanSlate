@@ -43,11 +43,16 @@ const SELECTORS = {
     'div[role="feed"] > div',
   ],
   optionsButton: [
+    '[aria-label="Actions for this item"]',
+    '[aria-label="Action options"]',
+    '[aria-label*="Action" i]',
     '[aria-label="Edit"]',
     '[aria-label="Options"]',
-    '[aria-label="Action options"]',
     '[aria-label="More options"]',
+    '[aria-label*="Option" i]',
+    '[aria-label="More"]',
     'div[role="button"][aria-haspopup="menu"]',
+    'div[role="button"][aria-haspopup="true"]',
   ],
   menuContainer: [
     '[role="menu"]',
@@ -122,7 +127,28 @@ export class LiveFacebookAdapter implements FacebookAdapter {
     logger.info('Scanning Facebook activity items', { context: { category } });
 
     const items: CleanupItem[] = [];
-    const elements = this.findAllElements(SELECTORS.activityItem);
+    let elements: Element[] = [];
+    const container = this.findFirstElement(SELECTORS.activityLogContainer) || document.body;
+
+    for (const sel of SELECTORS.activityItem) {
+      try {
+        const found = Array.from(container.querySelectorAll(sel));
+        const meaningful = found.filter((el) => {
+          const text = el.textContent?.trim() || '';
+          return text.length > 5 && !el.closest('header') && !el.closest('nav');
+        });
+        if (meaningful.length > 0) {
+          elements = meaningful;
+          break;
+        }
+      } catch {
+        // Skip
+      }
+    }
+
+    if (elements.length === 0) {
+      elements = this.findAllElements(SELECTORS.activityItem);
+    }
 
     for (let i = 0; i < elements.length; i++) {
       const el = elements[i];
@@ -140,7 +166,7 @@ export class LiveFacebookAdapter implements FacebookAdapter {
         description: textContent.trim().substring(0, 200),
         timestamp: this.extractTimestamp(el) || Date.now(),
         url: window.location.href,
-        actionable: hasOptionsBtn,
+        actionable: hasOptionsBtn || true,
       });
     }
 
