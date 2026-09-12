@@ -30,6 +30,8 @@ import {
 } from '../../types/common';
 import type { CleanupItem, OperationStats } from '../../types/operations';
 
+const SCAN_PROGRESS_STALE_MS = 15000;
+
 // ---- Pages ----
 
 type Page =
@@ -274,8 +276,12 @@ export function App() {
           loadedItems?: number;
           items?: CleanupItem[];
           category?: ActivityCategory;
+          updatedAt?: number;
         } | undefined;
-        if (scanProgress?.status === 'scanning') {
+        const scanIsRecent =
+          typeof scanProgress?.updatedAt === 'number' &&
+          Date.now() - scanProgress.updatedAt < SCAN_PROGRESS_STALE_MS;
+        if (scanProgress?.status === 'scanning' && scanIsRecent) {
           if (scanProgress.category) {
             dispatch({ type: 'SET_CATEGORY', category: scanProgress.category });
           }
@@ -292,6 +298,8 @@ export function App() {
           dispatch({ type: 'SET_DISCOVERED_ITEMS', items: scanProgress.items });
           dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.PreviewReady });
           dispatch({ type: 'SET_PAGE', page: 'scan_results' });
+        } else if (scanProgress?.status === 'scanning') {
+          await chrome.storage.local.remove('cleanslate_scan_progress');
         }
 
         // Detect platform
@@ -339,8 +347,19 @@ export function App() {
         loadedItems?: number;
         items?: CleanupItem[];
         category?: ActivityCategory;
+        updatedAt?: number;
       } | undefined;
       if (cancelled || !progress) return;
+
+      if (
+        progress.status === 'scanning' &&
+        (typeof progress.updatedAt !== 'number' ||
+          Date.now() - progress.updatedAt >= SCAN_PROGRESS_STALE_MS)
+      ) {
+        await chrome.storage.local.remove('cleanslate_scan_progress');
+        dispatch({ type: 'RESET' });
+        return;
+      }
 
       if (progress.status === 'complete' && progress.items && progress.category) {
         dispatch({ type: 'SET_CATEGORY', category: progress.category });
@@ -426,6 +445,7 @@ export function App() {
         dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.PreviewReady });
         dispatch({ type: 'SET_PAGE', page: 'scan_results' });
       } catch (err) {
+        await chrome.storage.local.remove('cleanslate_scan_progress');
         dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Idle });
         dispatch({
           type: 'SET_ERROR',
