@@ -277,7 +277,7 @@ export function App() {
     dispatch({ type: 'SET_PAGE', page: 'settings' });
   }, []);
 
-  const openFacebookActivityLog = useCallback(() => {
+  const openFacebookActivityLog = useCallback(async () => {
     const targetUrl = new URL('https://www.facebook.com/me/allactivity');
     targetUrl.searchParams.set('category_key', 'LIKESANDREACTIONSCLUSTER');
     const mode = state.dryRun ? 'preview' : 'execute';
@@ -286,7 +286,7 @@ export function App() {
     targetUrl.hash = `cleanslate_action=reactions_cleanup&cleanslate_mode=${mode}`;
 
     if (typeof chrome !== 'undefined' && chrome.tabs) {
-      void chrome.storage.local.set({
+      await chrome.storage.local.set({
         cleanslate_navigation: {
           platform: 'facebook',
           category: 'likes_reactions',
@@ -308,11 +308,11 @@ export function App() {
     window.open(targetUrl.toString(), '_blank');
   }, [state.dryRun]);
 
-  const openMessengerConversations = useCallback(() => {
+  const openMessengerConversations = useCallback(async () => {
     const targetUrl = 'https://www.messenger.com/';
 
     if (typeof chrome !== 'undefined' && chrome.tabs) {
-      void chrome.storage.local.set({
+      await chrome.storage.local.set({
         cleanslate_navigation: {
           platform: 'messenger',
           category: 'conversations',

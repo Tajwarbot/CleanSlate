@@ -33,7 +33,7 @@ function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
 
 function isVisible(element: Element): element is HTMLElement {
   const htmlElement = element as HTMLElement;
-  return htmlElement.offsetParent !== null;
+  return Boolean(htmlElement.isConnected && htmlElement.getClientRects().length > 0);
 }
 
 function getElementText(element: Element): string {
@@ -53,7 +53,7 @@ function getAutomationParameter(name: string): string | null {
 function isReactionsAutomationTarget(): boolean {
   const url = new URL(window.location.href);
   return (
-    (url.pathname === '/me/allactivity' || url.pathname === '/me/allactivity/') &&
+    url.pathname.includes('/me/allactivity') &&
     url.searchParams.get('category_key')?.toUpperCase() === 'LIKESANDREACTIONSCLUSTER' &&
     getAutomationParameter('cleanslate_action') === 'reactions_cleanup'
   );
