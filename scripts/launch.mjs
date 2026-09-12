@@ -61,7 +61,7 @@ const browsers = [
 ].filter((b) => Boolean(b.exe));
 
 console.log('\n====================================================');
-console.log('   🧼 CleanSlate Browser Extension Launcher');
+console.log('   🧼 CleanSlate Browser Extension Setup');
 console.log('====================================================\n');
 
 const rl = readline.createInterface({
@@ -72,68 +72,61 @@ const rl = readline.createInterface({
 function promptUser() {
   if (browsers.length === 0) {
     console.log('No supported browsers found automatically.');
-    openExplorerAndExtensions('https://www.facebook.com');
+    installIntoMainBrowser('chrome://extensions');
     rl.close();
     return;
   }
 
-  console.log('Detected installed browsers on your system:');
+  console.log('Select your browser to load CleanSlate into your logged-in profile:');
   browsers.forEach((b, index) => {
     console.log(`  [${index + 1}] ${b.name}`);
   });
-  console.log(`  [${browsers.length + 1}] Open File Explorer & Extensions Page (Manual 1-Click Load)`);
 
-  rl.question(`\nSelect your browser (1-${browsers.length + 1}) [Default: 1]: `, (answer) => {
+  rl.question(`\nSelect browser (1-${browsers.length}) [Default: 1]: `, (answer) => {
     const choiceIdx = parseInt(answer.trim() || '1', 10) - 1;
+    const selected = browsers[choiceIdx] || browsers[0];
 
-    if (choiceIdx >= 0 && choiceIdx < browsers.length) {
-      const selected = browsers[choiceIdx];
-      console.log(`\nSelected: ${selected.name}`);
-      console.log('  [1] Launch with your Existing Main Profile (Keeps your Facebook login active)');
-      console.log('  [2] Open Extensions page & Dist folder in File Explorer');
-
-      rl.question('\nChoice [Default: 1]: ', (profileChoice) => {
-        const mode = profileChoice.trim() || '1';
-        if (mode === '1') {
-          launchBrowserWithMainProfile(selected);
-        } else {
-          openExplorerAndExtensions(selected.extUrl);
-        }
-        rl.close();
-      });
-    } else {
-      openExplorerAndExtensions('brave://extensions');
-      rl.close();
-    }
+    installIntoMainBrowser(selected.extUrl, selected);
+    rl.close();
   });
 }
 
-function launchBrowserWithMainProfile(browser) {
-  console.log(`\n🚀 Launching ${browser.name} with your main logged-in profile...`);
-  console.log(`Pre-loading extension from: ${dist}\n`);
-
-  const cmd = `"${browser.exe}" --load-extension="${dist}" "https://www.facebook.com"`;
-  exec(cmd, (err) => {
-    if (err) {
-      console.log(`Could not launch directly. Opening extensions page instead.`);
-      openExplorerAndExtensions(browser.extUrl);
+function installIntoMainBrowser(extUrl, browser) {
+  // Copy dist directory path to Windows clipboard for effortless paste
+  try {
+    const psCmd = `pwsh -Command "Set-Clipboard -Value '${dist}'"`;
+    execSync(psCmd, { stdio: 'ignore' });
+    console.log(`\n📋 Extension path copied to your clipboard:`);
+    console.log(`   ${dist}\n`);
+  } catch {
+    // Fallback clip command
+    try {
+      execSync(`echo ${dist}| clip`, { stdio: 'ignore' });
+    } catch {
+      // Ignore if clip unavailable
     }
-  });
-}
+  }
 
-function openExplorerAndExtensions(extUrl) {
-  console.log(`\n📂 Opening build directory in File Explorer: ${dist}`);
+  console.log(`📂 Opening "dist" folder in File Explorer...`);
   exec(`explorer "${dist}"`);
 
-  console.log(`\n🌐 Opening extensions page: ${extUrl}`);
-  console.log('\n--- 1-Click Instructions ---');
-  console.log('1. Turn on "Developer mode" toggle in top-right of your browser.');
-  console.log('2. Click "Load unpacked" and select the opened "dist" folder.');
-  console.log('============================\n');
+  console.log(`🌐 Opening ${extUrl} in your browser...`);
+  
+  if (browser && browser.exe) {
+    exec(`"${browser.exe}" "${extUrl}"`);
+    exec(`"${browser.exe}" "https://www.facebook.com"`);
+  } else {
+    exec(`start ${extUrl}`);
+  }
 
-  exec(`start ${extUrl}`).on('error', () => {
-    exec(`start https://www.facebook.com`);
-  });
+  console.log('\n====================================================');
+  console.log('   ⚡ 3-STEP QUICK SETUP IN YOUR BROWSER:');
+  console.log('====================================================');
+  console.log(' 1️⃣  Toggle "Developer mode" ON (top-right of extensions page)');
+  console.log(' 2️⃣  Click "Load unpacked" (top-left button)');
+  console.log(' 3️⃣  Press Ctrl+V to paste folder path & click "Select Folder"');
+  console.log('====================================================\n');
+  console.log('Done! CleanSlate will stay installed permanently in your browser.');
 }
 
 promptUser();
