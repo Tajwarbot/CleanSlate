@@ -47,10 +47,14 @@ const SELECTORS = {
     'main [role="listitem"]',
   ],
   optionsButton: [
-    '[aria-label="Menu"]',
+    '[aria-label="More"]',
     '[aria-label="More options"]',
-    '[aria-label*="conversation"]',
-    'div[role="button"][aria-haspopup="menu"]',
+    '[aria-label="Message actions"]',
+    '[aria-label*="message actions" i]',
+    '[data-testid*="message-action" i]',
+    '[data-testid*="more" i]',
+    '[aria-label="Menu"]',
+    '[aria-haspopup="menu"]',
   ],
   menuContainer: [
     '[role="menu"]',
@@ -139,11 +143,13 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       const main = document.querySelector('main, [role="main"]');
       if (!main) return [];
 
-      const elements = this.findAllElements(SELECTORS.messageItem).filter((element) => {
-        if (!main.contains(element)) return false;
-        if (element.closest('[role="navigation"], [role="grid"], [aria-label="Chats"]')) return false;
-        return Boolean((element.textContent || '').trim());
-      });
+        await this.loadOlderMessages(main);
+
+        const elements = this.findAllElements(SELECTORS.messageItem).filter((element) => {
+          if (!main.contains(element)) return false;
+          if (element.closest('[role="navigation"], [role="grid"], [aria-label="Chats"]')) return false;
+          return Boolean((element.textContent || '').trim());
+        });
 
       this.messageTargets.clear();
       return elements.map((element, index) => {
@@ -213,7 +219,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       targetMessage.dispatchEvent(new MouseEvent('mouseover', { bubbles: true }));
       await delayWithJitter(400);
 
-      const optionsBtn = this.findFirstChild(targetMessage, SELECTORS.optionsButton) as HTMLElement | null;
+      const optionsBtn = this.findMessageOptionsButton(targetMessage);
       if (!optionsBtn) {
         return {
           itemId: item.id,
@@ -243,15 +249,14 @@ export class LiveMessengerAdapter implements MessengerAdapter {
 
       for (const mi of menuItems) {
         if (!mi) continue;
-        const text = (mi.textContent || mi.getAttribute('aria-label') || '').toLowerCase();
-        if (text.includes('delete') || text.includes('remove')) {
+        const text = this.getAccessibleText(mi);
+        if (
+          /^(delete|remove|unsend)(\s+message)?$/i.test(text) ||
+          /^(remove|delete)\s+(for you|for everyone)$/i.test(text)
+        ) {
           deleteBtn = mi as HTMLElement;
           break;
         }
-      }
-
-      if (!deleteBtn && menuItems.length > 0 && menuItems[menuItems.length - 1]) {
-        deleteBtn = menuItems[menuItems.length - 1] as HTMLElement;
       }
 
       if (!deleteBtn) {
@@ -361,5 +366,83 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       }
     }
     return [];
+  }
+
+  private getAccessibleText(element: Element): string {
+    return (
+      element.getAttribute('aria-label') ||
+      element.textContent ||
+      ''
+    ).replace(/\s+/g, ' ').trim();
+  }
+
+  private findMessageOptionsButton(message: Element): HTMLElement | null {
+    let current: Element | null = message;
+    for (let depth = 0; current && depth < 8; depth++, current = current.parentElement) {
+      const button = this.findFirstChild(current, SELECTORS.optionsButton);
+      if (button instanceof HTMLElement) return button;
+    }
+
+    const visibleButtons = Array.from(
+      document.querySelectorAll<HTMLElement>(
+        '[aria-label], [role="button"][aria-haspopup="menu"], button',
+      ),
+    ).filter((button) => {
+      if (!button.isConnected || button.getClientRects().length === 0) return false;
+      const label = this.getAccessibleText(button).toLowerCase();
+      return (
+        label.includes('more') ||
+        label.includes('message action') ||
+        label === 'menu'
+      );
+    });
+
+    return visibleButtons.find((button) => {
+      let parent: Element | null = button;
+      for (let depth = 0; parent && depth < 8; depth++, parent = parent.parentElement) {
+        if (parent === message) return true;
+      }
+      return false;
+    }) || null;
+  }
+
+  private async loadOlderMessages(main: Element): Promise<void> {
+    const scrollContainer = this.findMessageScrollContainer(main);
+    if (!scrollContainer) return;
+
+    let stablePasses = 0;
+    let previousHeight = scrollContainer.scrollHeight;
+    let previousCount = this.findAllElements(SELECTORS.messageItem).filter((element) =>
+      main.contains(element),
+    ).length;
+
+    for (let pass = 0; pass < 80 && stablePasses < 5; pass++) {
+      scrollContainer.scrollTop = 0;
+      scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
+      await new Promise((resolve) => setTimeout(resolve, 900));
+
+      const nextHeight = scrollContainer.scrollHeight;
+      const nextCount = this.findAllElements(SELECTORS.messageItem).filter((element) =>
+        main.contains(element),
+      ).length;
+      const changed = nextHeight !== previousHeight || nextCount !== previousCount;
+      stablePasses = changed ? 0 : stablePasses + 1;
+      previousHeight = nextHeight;
+      previousCount = nextCount;
+    }
+  }
+
+  private findMessageScrollContainer(main: Element): HTMLElement | null {
+    const candidates = [main, ...Array.from(main.querySelectorAll<HTMLElement>('*'))].filter(
+      (element): element is HTMLElement =>
+        element instanceof HTMLElement &&
+        element.scrollHeight > element.clientHeight + 80 &&
+        getComputedStyle(element).overflowY !== 'hidden',
+    );
+
+    return candidates.sort(
+      (a, b) =>
+        b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight),
+    )[0] || null;
   }
 }
