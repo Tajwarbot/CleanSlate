@@ -389,6 +389,7 @@ export function App() {
       await chrome.storage.local.remove('cleanslate_guided_category');
       dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Scanning });
       await chrome.storage.local.set({
+        cleanslate_scan_control: { action: 'continue', updatedAt: Date.now() },
         cleanslate_scan_progress: {
           status: 'scanning',
           phase: 'Connecting to page',
@@ -420,6 +421,7 @@ export function App() {
         }
 
         const items = (result?.items ?? []) as CleanupItem[];
+        await chrome.storage.local.remove('cleanslate_scan_control');
         dispatch({ type: 'SET_DISCOVERED_ITEMS', items });
         dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.PreviewReady });
         dispatch({ type: 'SET_PAGE', page: 'scan_results' });
@@ -434,6 +436,18 @@ export function App() {
     },
     [ext, state.dryRun],
   );
+
+  const handleStopLoading = useCallback(async () => {
+    await chrome.storage.local.set({
+      cleanslate_scan_control: { action: 'stop', updatedAt: Date.now() },
+    });
+  }, []);
+
+  const handleContinueLoading = useCallback(async () => {
+    await chrome.storage.local.set({
+      cleanslate_scan_control: { action: 'continue', updatedAt: Date.now() },
+    });
+  }, []);
 
   const handleSelectItems = useCallback(
     (items: CleanupItem[]) => {
@@ -567,6 +581,8 @@ export function App() {
             phase={state.scanProgress.phase}
             detail={state.scanProgress.detail}
             loadedItems={state.scanProgress.loadedItems}
+            onStopLoading={handleStopLoading}
+            onContinueLoading={handleContinueLoading}
           />
         )}
 

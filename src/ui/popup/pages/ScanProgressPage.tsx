@@ -2,9 +2,17 @@ interface ScanProgressPageProps {
   phase: string;
   detail: string;
   loadedItems: number;
+  onStopLoading: () => void;
+  onContinueLoading: () => void;
 }
 
-export function ScanProgressPage({ phase, detail, loadedItems }: ScanProgressPageProps) {
+export function ScanProgressPage({
+  phase,
+  detail,
+  loadedItems,
+  onStopLoading,
+  onContinueLoading,
+}: ScanProgressPageProps) {
   return (
     <div className="cs-page cs-animate-fade-in">
       <div className="cs-activity__title">Loading activity</div>
@@ -34,8 +42,25 @@ export function ScanProgressPage({ phase, detail, loadedItems }: ScanProgressPag
           {loadedItems} items discovered so far
         </div>
       </div>
+      <div className="cs-scan-progress__actions">
+        <button
+          type="button"
+          className="cs-btn cs-btn--danger cs-btn--full"
+          onClick={onStopLoading}
+        >
+          Stop here and review this batch
+        </button>
+        <button
+          type="button"
+          className="cs-btn cs-btn--ghost cs-btn--full"
+          onClick={onContinueLoading}
+        >
+          Continue loading to the end
+        </button>
+      </div>
       <div className="cs-settings__label-desc">
-        Keep the Facebook tab open. You can close and reopen this popup; loading continues in the tab.
+        Stopping keeps the activity currently rendered in Facebook. Cleanup then uses Facebook's
+        native All and Remove controls for that batch.
       </div>
     </div>
   );

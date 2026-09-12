@@ -192,3 +192,10 @@ body {
   white-space: nowrap;
   border-width: 0;
 }
+
+.cs-scan-progress__actions {
+  display: flex;
+  flex-direction: column;
+  gap: var(--cs-space-sm);
+  margin-bottom: var(--cs-space-lg);
+}

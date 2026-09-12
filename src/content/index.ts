@@ -107,7 +107,12 @@ async function getStoredNavigation(): Promise<{
   }
 }
 
-async function waitForActivityItemsToLoad(): Promise<void> {
+async function isScanStopRequested(): Promise<boolean> {
+  const result = await chrome.storage.local.get('cleanslate_scan_control');
+  return (result['cleanslate_scan_control'] as { action?: string } | undefined)?.action === 'stop';
+}
+
+async function waitForActivityItemsToLoad(category?: ActivityCategory): Promise<boolean> {
   const writeProgress = async (phase: string, detail: string, loadedItems = 0) => {
     await chrome.storage.local.set({
       cleanslate_scan_progress: {
@@ -115,6 +120,7 @@ async function waitForActivityItemsToLoad(): Promise<void> {
         phase,
         detail,
         loadedItems,
+        category,
         updatedAt: Date.now(),
       },
     });
@@ -127,6 +133,16 @@ async function waitForActivityItemsToLoad(): Promise<void> {
   let previousScrollHeight = 0;
 
   for (let i = 0; i < AUTOMATION_MAX_SCROLLS && stableScrollHeightCount < 3; i++) {
+    if (await isScanStopRequested()) {
+      await writeProgress(
+        'Stopped at current batch',
+        'Loading stopped. The activity currently rendered on Facebook is ready to review.',
+        document.querySelectorAll('[role="row"], [role="article"]').length,
+      );
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+      return false;
+    }
+
     await writeProgress(
       'Loading more activity',
       `Scrolling through Facebook activity (${i + 1}/${AUTOMATION_MAX_SCROLLS}).`,
@@ -171,6 +187,7 @@ async function waitForActivityItemsToLoad(): Promise<void> {
     'The page is loaded. Building a reviewable activity list.',
     document.querySelectorAll('[role="row"], [role="article"]').length,
   );
+  return true;
 }
 
 function findSelectAllCheckbox(): HTMLElement | null {
@@ -215,7 +232,6 @@ async function runFacebookBulkCleanup(
   dryRun: boolean,
 ): Promise<{ status: 'success' | 'failed'; message?: string }> {
   await selectRenderedCategory(category);
-  await waitForActivityItemsToLoad();
 
   const selectAll = await waitForControl(findSelectAllCheckbox);
   if (!selectAll) {
@@ -342,7 +358,7 @@ async function runAutomaticReactionsCleanupImpl(
     context: { mode },
   });
 
-  await waitForActivityItemsToLoad();
+  await waitForActivityItemsToLoad(FacebookCategory.LikesReactions);
   const scannedItems = await fbAdapter.scanActivity(FacebookCategory.LikesReactions);
   logger.info('Automatic Likes & Reactions scan completed', {
     context: { itemsFound: scannedItems.length },
@@ -425,7 +441,7 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
         items = await msgerAdapter.discoverConversations();
       } else {
         await selectRenderedCategory(category);
-        await waitForActivityItemsToLoad();
+        await waitForActivityItemsToLoad(category);
         items = await fbAdapter.scanActivity(category);
       }
 
