@@ -27,14 +27,7 @@ const localAppData = process.env.LOCALAPPDATA || resolve(os.homedir(), 'AppData/
 const programFiles = process.env['ProgramFiles'] || 'C:\\Program Files';
 const programFilesX86 = process.env['ProgramFiles(x86)'] || 'C:\\Program Files (x86)';
 
-interface BrowserOption {
-  id: string;
-  name: string;
-  exe: string;
-  extUrl: string;
-}
-
-const browsers: BrowserOption[] = [
+const browsers = [
   {
     id: 'brave',
     name: 'Brave Browser',
@@ -115,11 +108,10 @@ function promptUser() {
   });
 }
 
-function launchBrowserWithMainProfile(browser: BrowserOption) {
+function launchBrowserWithMainProfile(browser) {
   console.log(`\n🚀 Launching ${browser.name} with your main logged-in profile...`);
   console.log(`Pre-loading extension from: ${dist}\n`);
 
-  // Launching browser with --load-extension using default user data directory
   const cmd = `"${browser.exe}" --load-extension="${dist}" "https://www.facebook.com"`;
   exec(cmd, (err) => {
     if (err) {
@@ -129,7 +121,7 @@ function launchBrowserWithMainProfile(browser: BrowserOption) {
   });
 }
 
-function openExplorerAndExtensions(extUrl: string) {
+function openExplorerAndExtensions(extUrl) {
   console.log(`\n📂 Opening build directory in File Explorer: ${dist}`);
   exec(`explorer "${dist}"`);
 
