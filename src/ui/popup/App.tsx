@@ -30,7 +30,7 @@ import {
 } from '../../types/common';
 import type { CleanupItem, OperationStats } from '../../types/operations';
 
-const SCAN_PROGRESS_STALE_MS = 15000;
+const SCAN_PROGRESS_STALE_MS = 300000;
 const GUIDED_HANDOFF_STALE_MS = 60000;
 
 // ---- Pages ----
