@@ -19,10 +19,10 @@ const msgerAdapter = new LiveMessengerAdapter();
 
 const AUTOMATION_SETTLE_DELAY_MS = 1200;
 const AUTOMATION_SCROLL_DELAY_MS = 1100;
-const AUTOMATION_MAX_SCROLLS = 80;
+const AUTOMATION_MAX_SCROLLS = 1000;
 const AUTOMATION_WAIT_TIMEOUT_MS = 30000;
 const AUTOMATION_POLL_INTERVAL_MS = 500;
-const AUTOMATION_STABLE_PASSES_TO_FINISH = 8;
+const AUTOMATION_STABLE_PASSES_TO_FINISH = 12;
 
 /** Determine which platform we're on */
 function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
