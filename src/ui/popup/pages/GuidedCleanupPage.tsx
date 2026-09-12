@@ -46,9 +46,9 @@ function getDestination(category: ActivityCategory): { label: string; url: strin
           current.pathname.includes('/me/allactivity') ||
           (current.pathname === '/profile.php' &&
             current.searchParams.get('sk')?.toLowerCase() === 'allactivity');
-        const currentCategory = current.searchParams.get('category_key')?.toUpperCase();
-
-        return isActivityLog && (!categoryKey || currentCategory === categoryKey);
+        // Facebook may strip or rewrite category_key after loading the Activity
+        // Log. The content script verifies/selects the visible category UI.
+        return isActivityLog;
       } catch {
         return false;
       }
