@@ -11,6 +11,7 @@ import type { CleanupItem, OperationStats } from '../types/operations';
 import { OperationState } from '../types/state';
 import { validateIncomingMessage, isAuthorizedMessage } from '../utils/validation';
 import { logger } from '../core/logging/logger';
+import { loadSettings, saveSettings } from '../storage/settings';
 
 /**
  * Handle incoming messages from popup and content scripts.
@@ -80,7 +81,11 @@ function routeMessage(
       break;
 
     case MessageType.GetSettings:
-      sendResponse({ settings: {} });
+      void handleGetSettings(sendResponse);
+      break;
+
+    case MessageType.UpdateSettings:
+      void handleUpdateSettings(message, sendResponse);
       break;
 
     case MessageType.DetectCapabilities:
@@ -106,6 +111,34 @@ function routeMessage(
     case MessageType.PauseOperation:
       if (activeOperation) {
         activeOperation.paused = true;
+      }
+
+      async function handleGetSettings(sendResponse: (response: unknown) => void): Promise<void> {
+        try {
+          sendResponse({ settings: await loadSettings() });
+        } catch (error) {
+          sendResponse({
+            error: error instanceof Error ? error.message : 'Failed to load settings',
+          });
+        }
+      }
+
+      async function handleUpdateSettings(
+        message: ExtensionMessage,
+        sendResponse: (response: unknown) => void,
+      ): Promise<void> {
+        if (message.type !== MessageType.UpdateSettings) {
+          sendResponse({ error: 'Invalid settings message' });
+          return;
+        }
+
+        try {
+          sendResponse({ settings: await saveSettings(message.settings) });
+        } catch (error) {
+          sendResponse({
+            error: error instanceof Error ? error.message : 'Failed to save settings',
+          });
+        }
       }
       sendResponse({ acknowledged: true });
       break;

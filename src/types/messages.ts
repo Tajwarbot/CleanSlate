@@ -12,6 +12,7 @@ import type {
   ActivityCategory,
   Capability,
   CleanSlateErrorInfo,
+  CleanSlateSettings,
   OperationId,
 } from './common';
 import type {
@@ -192,7 +193,7 @@ export interface GetSettingsMessage extends BaseMessage {
 
 export interface UpdateSettingsMessage extends BaseMessage {
   readonly type: MessageType.UpdateSettings;
-  readonly settings: Record<string, unknown>;
+  readonly settings: Partial<CleanSlateSettings>;
 }
 
 export interface SettingsResultMessage extends BaseMessage {

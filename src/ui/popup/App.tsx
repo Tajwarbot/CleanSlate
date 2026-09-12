@@ -249,6 +249,22 @@ export function App() {
     void init();
   }, []); // Run once on mount to prevent infinite re-render loops
 
+  useEffect(() => {
+    const applyTheme = () => {
+      const theme = state.settings.theme;
+      const prefersDark = window.matchMedia('(prefers-color-scheme: dark)').matches;
+      const resolvedTheme = theme === 'system' ? (prefersDark ? 'dark' : 'light') : theme;
+      document.documentElement.dataset.theme = resolvedTheme;
+    };
+
+    applyTheme();
+    if (state.settings.theme !== 'system') return;
+
+    const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');
+    mediaQuery.addEventListener('change', applyTheme);
+    return () => mediaQuery.removeEventListener('change', applyTheme);
+  }, [state.settings.theme]);
+
   // ---- Event handlers ----
 
   const goToDashboard = useCallback(() => {
