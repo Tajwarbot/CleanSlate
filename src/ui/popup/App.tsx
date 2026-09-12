@@ -626,6 +626,7 @@ export function App() {
 
         {state.page === 'scan_progress' && (
           <ScanProgressPage
+            isMessenger={state.category === MessengerCategory.Conversations}
             phase={state.scanProgress.phase}
             detail={state.scanProgress.detail}
             loadedItems={state.scanProgress.loadedItems}

@@ -153,6 +153,9 @@ function routeMessage(
     case MessageType.StopOperation:
       if (activeOperation) {
         activeOperation.stopped = true;
+        void chrome.storage.local.set({
+          cleanslate_scan_control: { action: 'stop', updatedAt: Date.now() },
+        });
       }
       sendResponse({ acknowledged: true });
       break;

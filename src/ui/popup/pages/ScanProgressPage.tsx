@@ -1,4 +1,5 @@
 interface ScanProgressPageProps {
+  isMessenger?: boolean;
   phase: string;
   detail: string;
   loadedItems: number;
@@ -8,6 +9,7 @@ interface ScanProgressPageProps {
 }
 
 export function ScanProgressPage({
+  isMessenger = false,
   phase,
   detail,
   loadedItems,
@@ -17,7 +19,9 @@ export function ScanProgressPage({
 }: ScanProgressPageProps) {
   return (
     <div className="cs-page cs-animate-fade-in">
-      <div className="cs-activity__title">Loading activity</div>
+      <div className="cs-activity__title">
+        {isMessenger ? 'Preparing message history' : 'Loading activity'}
+      </div>
       <div className="cs-card" style={{ padding: 'var(--cs-space-md)', marginBottom: 'var(--cs-space-md)' }}>
         <div style={{ fontWeight: 700, marginBottom: 'var(--cs-space-sm)' }}>{phase}</div>
         <div style={{ color: 'var(--cs-text-secondary)', marginBottom: 'var(--cs-space-md)' }}>{detail}</div>
@@ -41,7 +45,9 @@ export function ScanProgressPage({
           />
         </div>
         <div style={{ marginTop: 'var(--cs-space-md)', color: 'var(--cs-text-tertiary)' }}>
-          {loadedItems} items discovered so far
+          {isMessenger
+            ? 'Older messages load during the controlled cleanup pass.'
+            : `${loadedItems} items discovered so far`}
         </div>
       </div>
       <div className="cs-scan-progress__actions">
@@ -50,14 +56,14 @@ export function ScanProgressPage({
           className="cs-btn cs-btn--danger cs-btn--full"
           onClick={onStopLoading}
         >
-          Stop here and review this batch
+          {isMessenger ? 'Stop loading and review visible messages' : 'Stop here and review this batch'}
         </button>
         <button
           type="button"
           className="cs-btn cs-btn--ghost cs-btn--full"
           onClick={onContinueLoading}
         >
-          Continue loading to the end
+          {isMessenger ? 'Continue with controlled message loading' : 'Continue loading to the end'}
         </button>
         <button
           type="button"
@@ -68,8 +74,9 @@ export function ScanProgressPage({
         </button>
       </div>
       <div className="cs-settings__label-desc">
-        Stopping keeps the activity currently rendered in Facebook. Cleanup then uses Facebook's
-        native All and Remove controls for that batch.
+        {isMessenger
+          ? 'CleanSlate works only in the open conversation, processes messages one at a time, and pauses between removal requests.'
+          : "Stopping keeps the activity currently rendered in Facebook. Cleanup then uses Facebook's native All and Remove controls for that batch."}
       </div>
     </div>
   );

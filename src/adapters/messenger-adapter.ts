@@ -89,7 +89,9 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     const main = this.findConversationRoot();
     if (!main) return { processed: 0, successful: 0, failed: 0 };
 
-    await this.loadOlderMessages(main);
+    if (!(await this.loadOlderMessages(main))) {
+      return { processed: 0, successful: 0, failed: 0 };
+    }
     let successful = 0;
     let failed = 0;
     let stablePasses = 0;
@@ -128,7 +130,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       }
 
       const beforeCount = rows.length;
-      await this.loadOlderMessages(main);
+      if (!(await this.loadOlderMessages(main))) break;
       const afterCount = this.getMessageRows(main).length;
       stablePasses = changed || afterCount !== beforeCount ? 0 : stablePasses + 1;
       if (dryRun) break;
@@ -197,8 +199,6 @@ export class LiveMessengerAdapter implements MessengerAdapter {
 
       const main = this.findConversationRoot();
       if (!main) return [];
-
-        await this.loadOlderMessages(main);
 
         const elements = this.getMessageRows(main);
 
@@ -476,9 +476,9 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     }) || null;
   }
 
-  private async loadOlderMessages(main: Element): Promise<void> {
+  private async loadOlderMessages(main: Element): Promise<boolean> {
     const scrollContainer = this.findMessageScrollContainer(main);
-    if (!scrollContainer) return;
+    if (!scrollContainer) return true;
 
     scrollContainer.scrollTop = scrollContainer.scrollHeight;
     await delayWithJitter(1200);
@@ -490,6 +490,7 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     ).length;
 
     for (let pass = 0; pass < 120; pass++) {
+      if (await this.shouldStop()) return false;
       scrollContainer.scrollTop = 0;
       scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
 
@@ -510,6 +511,13 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       previousCount = nextCount;
       if (stablePasses >= 5 && !loading) break;
     }
+    return true;
+  }
+
+  private async shouldStop(): Promise<boolean> {
+    const result = await chrome.storage.local.get('cleanslate_scan_control');
+    const action = (result['cleanslate_scan_control'] as { action?: string } | undefined)?.action;
+    return action === 'stop' || action === 'cancel';
   }
 
   private findMessageScrollContainer(main: Element): HTMLElement | null {

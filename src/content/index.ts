@@ -555,6 +555,16 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
       let items: ReadonlyArray<CleanupItem> = [];
 
       if (platform === 'messenger' || category === MessengerCategory.Conversations) {
+        await chrome.storage.local.set({
+          cleanslate_scan_progress: {
+            status: 'complete',
+            phase: 'Messages ready to review',
+            detail: 'Visible messages are ready. Continue to load older messages during cleanup.',
+            loadedItems: 0,
+            category,
+            updatedAt: Date.now(),
+          },
+        });
         items = await msgerAdapter.discoverMessagesInOpenConversation();
       } else {
         await selectRenderedCategory(category);
