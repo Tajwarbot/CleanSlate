@@ -27,34 +27,24 @@
 | **Storage Layer** | `src/storage/` | ✅ Complete | Settings persistence & session state recovery after browser reload |
 | **Service Worker** | `src/background/service-worker.ts` | ✅ Complete | Strongly-typed message router between popup and content scripts |
 | **React Popup UI** | `src/ui/popup/` | ✅ Complete | 8 Page Views, 7 Shared Components, custom hook, CSS design system |
-| **Build & Package** | `vite.config.ts`, `scripts/` | ✅ Complete | Vite pipeline, PNG icon generator, zip package, browser launcher |
+| **Build & Package** | `vite.config.ts`, `scripts/` | ✅ Complete | Vite pipeline, PNG icon generator, zip package, multi-browser launcher |
 | **Facebook DOM Adapter** | `src/adapters/facebook-adapter.ts` | ✅ Complete | Live DOM activity scanning, action execution, modal confirmation, verification |
 | **Messenger DOM Adapter** | `src/adapters/messenger-adapter.ts` | ✅ Complete | Live conversation discovery, chat deletion, confirmation handling, verification |
 | **Content Script Wiring** | `src/content/index.ts` | ✅ Complete | Injected script connecting DOM adapters to Service Worker messaging |
 
 ---
 
-## 🚀 One-Click Non-Technical Installation
+## 🚀 Easy Non-Technical Multi-Browser Setup
 
-For non-CS users, we provide a 1-click launcher and installer:
+Supports **Brave**, **Google Chrome**, and **Microsoft Edge**:
 
 ### Option 1: Double-Click `install.bat` (Windows)
-Double-click `install.bat` in the project folder. It builds the extension and launches Chrome / Edge with CleanSlate pre-loaded automatically.
+Double-clicking `install.bat` automatically detects installed browsers on your PC (Brave, Chrome, Edge) and lets you launch directly using your **Main Logged-In Profile** so your Facebook/Messenger session is preserved!
 
-### Option 2: Terminal One-Liner
+### Option 2: Terminal Command
 ```powershell
 npm start
 ```
-Or for packaging into a `.zip` file for manual uploading:
-```powershell
-npm run package
-```
 
----
-
-## 📝 Current Development Phase: Testing & Refinement
-
-### Active Objectives
-1. **End-to-End Testing**: Unit tests for adapters, safety controller, and state machine using Vitest.
-2. **Localization (i18n)**: Extend `_locales/en/messages.json` strings for any remaining UI labels.
-3. **Documentation & Release Packaging**: Finalizing release artifacts for browser extension stores.
+### Option 3: Manual Load via File Explorer
+`npm run launch` can also open the `dist/` directory in File Explorer and open `brave://extensions` (or `chrome://extensions`) for 1-click drag & drop installation into any Chromium browser.
