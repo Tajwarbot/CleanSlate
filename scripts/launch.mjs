@@ -9,6 +9,7 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 const root = resolve(__dirname, '..');
 const dist = resolve(root, 'dist');
+const devProfile = resolve(root, '.cleanslate-profile');
 
 // Ensure extension is built
 if (!existsSync(resolve(dist, 'manifest.json'))) {
@@ -61,7 +62,7 @@ const browsers = [
 ].filter((b) => Boolean(b.exe));
 
 console.log('\n====================================================');
-console.log('   🧼 CleanSlate Browser Extension Setup');
+console.log('   🧼 CleanSlate Extension Installation Helper');
 console.log('====================================================\n');
 
 const rl = readline.createInterface({
@@ -72,12 +73,12 @@ const rl = readline.createInterface({
 function promptUser() {
   if (browsers.length === 0) {
     console.log('No supported browsers found automatically.');
-    installIntoMainBrowser('chrome://extensions');
+    openExtensionsPage('chrome://extensions');
     rl.close();
     return;
   }
 
-  console.log('Select your browser to load CleanSlate into your logged-in profile:');
+  console.log('Detected installed browsers:');
   browsers.forEach((b, index) => {
     console.log(`  [${index + 1}] ${b.name}`);
   });
@@ -86,24 +87,40 @@ function promptUser() {
     const choiceIdx = parseInt(answer.trim() || '1', 10) - 1;
     const selected = browsers[choiceIdx] || browsers[0];
 
-    installIntoMainBrowser(selected.extUrl, selected);
-    rl.close();
+    console.log(`\nHow would you like to install CleanSlate into ${selected.name}?`);
+    console.log('  [1] Permanent Install (Opens extensions page + copies folder path to Ctrl+V)');
+    console.log('  [2] Direct Launch Window (Starts browser instance with extension pre-loaded)');
+
+    rl.question('\nSelect mode (1 or 2) [Default: 1]: ', (modeAns) => {
+      const mode = modeAns.trim() || '1';
+      if (mode === '2') {
+        launchDirectDevWindow(selected);
+      } else {
+        openExtensionsPage(selected.extUrl, selected);
+      }
+      rl.close();
+    });
   });
 }
 
-function installIntoMainBrowser(extUrl, browser) {
-  // Copy dist directory path to Windows clipboard for effortless paste
+function launchDirectDevWindow(browser) {
+  console.log(`\n🚀 Launching ${browser.name} with CleanSlate pre-loaded...`);
+  const cmd = `"${browser.exe}" --user-data-dir="${devProfile}" --disable-extensions-except="${dist}" --load-extension="${dist}" "${browser.extUrl}"`;
+  exec(cmd);
+  console.log('Browser launched successfully into extensions page!');
+}
+
+function openExtensionsPage(extUrl, browser) {
   try {
     const psCmd = `pwsh -Command "Set-Clipboard -Value '${dist}'"`;
     execSync(psCmd, { stdio: 'ignore' });
-    console.log(`\n📋 Extension path copied to your clipboard:`);
+    console.log(`\n📋 CleanSlate folder path copied to your clipboard:`);
     console.log(`   ${dist}\n`);
   } catch {
-    // Fallback clip command
     try {
       execSync(`echo ${dist}| clip`, { stdio: 'ignore' });
     } catch {
-      // Ignore if clip unavailable
+      // Ignore fallback
     }
   }
 
@@ -111,22 +128,20 @@ function installIntoMainBrowser(extUrl, browser) {
   exec(`explorer "${dist}"`);
 
   console.log(`🌐 Opening ${extUrl} in your browser...`);
-  
   if (browser && browser.exe) {
     exec(`"${browser.exe}" "${extUrl}"`);
-    exec(`"${browser.exe}" "https://www.facebook.com"`);
   } else {
     exec(`start ${extUrl}`);
   }
 
   console.log('\n====================================================');
-  console.log('   ⚡ 3-STEP QUICK SETUP IN YOUR BROWSER:');
+  console.log('   ⚡ 3-STEP INSTALLATION:');
   console.log('====================================================');
   console.log(' 1️⃣  Toggle "Developer mode" ON (top-right of extensions page)');
   console.log(' 2️⃣  Click "Load unpacked" (top-left button)');
-  console.log(' 3️⃣  Press Ctrl+V to paste folder path & click "Select Folder"');
+  console.log(' 3️⃣  Press Ctrl+V to paste path & click "Select Folder"');
   console.log('====================================================\n');
-  console.log('Done! CleanSlate will stay installed permanently in your browser.');
+  console.log('CleanSlate will now remain installed permanently in your browser toolbar!');
 }
 
 promptUser();
