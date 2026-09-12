@@ -31,6 +31,7 @@ import {
 import type { CleanupItem, OperationStats } from '../../types/operations';
 
 const SCAN_PROGRESS_STALE_MS = 15000;
+const GUIDED_HANDOFF_STALE_MS = 60000;
 
 // ---- Pages ----
 
@@ -263,9 +264,25 @@ export function App() {
         }
 
         const pending = await chrome.storage.local.get('cleanslate_guided_category');
-        const pendingCategory = pending['cleanslate_guided_category'] as ActivityCategory | undefined;
-        if (pendingCategory) {
+        const pendingValue = pending['cleanslate_guided_category'] as
+          | ActivityCategory
+          | { category?: ActivityCategory; updatedAt?: number }
+          | undefined;
+        const pendingCategory =
+          typeof pendingValue === 'string'
+            ? pendingValue
+            : pendingValue?.category;
+        const pendingUpdatedAt =
+          typeof pendingValue === 'object' && pendingValue
+            ? pendingValue.updatedAt
+            : undefined;
+        const guidedHandoffIsRecent =
+          typeof pendingUpdatedAt === 'number' &&
+          Date.now() - pendingUpdatedAt < GUIDED_HANDOFF_STALE_MS;
+        if (pendingCategory && guidedHandoffIsRecent) {
           dispatch({ type: 'SET_GUIDED_CATEGORY', category: pendingCategory });
+        } else if (pendingValue) {
+          await chrome.storage.local.remove('cleanslate_guided_category');
         }
 
         const scan = await chrome.storage.local.get('cleanslate_scan_progress');
@@ -390,6 +407,7 @@ export function App() {
   // ---- Event handlers ----
 
   const goToDashboard = useCallback(() => {
+    void chrome.storage.local.remove('cleanslate_guided_category');
     dispatch({ type: 'RESET' });
   }, []);
 
@@ -398,7 +416,12 @@ export function App() {
   }, []);
 
   const beginGuidedCleanup = useCallback(async (category: ActivityCategory) => {
-    await chrome.storage.local.set({ cleanslate_guided_category: category });
+    await chrome.storage.local.set({
+      cleanslate_guided_category: {
+        category,
+        updatedAt: Date.now(),
+      },
+    });
     dispatch({ type: 'SET_GUIDED_CATEGORY', category });
   }, []);
 
