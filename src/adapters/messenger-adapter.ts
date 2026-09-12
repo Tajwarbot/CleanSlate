@@ -41,20 +41,15 @@ const SELECTORS = {
     'div[role="grid"] > div',
   ],
   messageItem: [
+    '[role="row"]:has([data-scope="messages_table"])',
+    '[role="row"].__fb-light-mode',
+    '[role="row"].__fb-dark-mode',
     '[data-message-id]',
     '[data-testid*="message"]',
-    '[role="main"] [role="row"]',
-    'main [role="listitem"]',
   ],
   optionsButton: [
     '[aria-label="More"]',
     '[aria-label="More options"]',
-    '[aria-label="Message actions"]',
-    '[aria-label*="message actions" i]',
-    '[data-testid*="message-action" i]',
-    '[data-testid*="more" i]',
-    '[aria-label="Menu"]',
-    '[aria-haspopup="menu"]',
   ],
   menuContainer: [
     '[role="menu"]',
@@ -69,8 +64,8 @@ const SELECTORS = {
     'div[aria-label*="Delete"]',
   ],
   confirmButton: [
-    '[role="dialog"] [role="button"][aria-label*="Delete"]',
-    '[role="dialog"] [role="button"][tabindex="0"]',
+    '[aria-label="Unsend"]:not([aria-disabled="true"])',
+    '[aria-label="Remove"]:not([aria-disabled="true"])',
   ],
   securityChallenge: [
     '[id*="checkpoint"]',
@@ -244,20 +239,12 @@ export class LiveMessengerAdapter implements MessengerAdapter {
         };
       }
 
-      const menuItems = this.findAllChildElements(menu, SELECTORS.menuItems);
-      let deleteBtn: HTMLElement | null = null;
-
-      for (const mi of menuItems) {
-        if (!mi) continue;
-        const text = this.getAccessibleText(mi);
-        if (
-          /^(delete|remove|unsend)(\s+message)?$/i.test(text) ||
-          /^(remove|delete)\s+(for you|for everyone)$/i.test(text)
-        ) {
-          deleteBtn = mi as HTMLElement;
-          break;
-        }
-      }
+      const deleteBtn = this.findFirstElement([
+        '[aria-label="Remove message"]',
+        '[aria-label="Remove Message"]',
+        '[aria-label="Unsend Message"]',
+        '[aria-label="Unsend message"]',
+      ]) as HTMLElement | null;
 
       if (!deleteBtn) {
         return {
@@ -270,16 +257,21 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       }
 
       deleteBtn.click();
-      await delayWithJitter(600);
+      await delayWithJitter(900);
 
-      const dialog = this.findFirstElement(SELECTORS.confirmModal);
-      if (dialog) {
-        const confirmBtn = this.findFirstChild(dialog, SELECTORS.confirmButton) as HTMLElement | null;
-        if (confirmBtn) {
-          confirmBtn.click();
-          await delayWithJitter(600);
-        }
+      const confirmBtn = this.findFirstElement(SELECTORS.confirmButton) as HTMLElement | null;
+      if (!confirmBtn) {
+        this.dismissOpenMenu();
+        return {
+          itemId: item.id,
+          status: ActionStatus.Failed,
+          message: 'Messenger removal confirmation was not found',
+          timestamp: Date.now(),
+          durationMs: Date.now() - startTime,
+        };
       }
+      confirmBtn.click();
+      await delayWithJitter(1600);
 
       return {
         itemId: item.id,
@@ -356,18 +348,6 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     return null;
   }
 
-  private findAllChildElements(parent: Element, selectors: readonly string[]): Element[] {
-    for (const sel of selectors) {
-      try {
-        const els = Array.from(parent.querySelectorAll(sel));
-        if (els.length > 0) return els;
-      } catch {
-        // Skip invalid selector
-      }
-    }
-    return [];
-  }
-
   private getAccessibleText(element: Element): string {
     return (
       element.getAttribute('aria-label') ||
@@ -383,18 +363,10 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       if (button instanceof HTMLElement) return button;
     }
 
-    const visibleButtons = Array.from(
-      document.querySelectorAll<HTMLElement>(
-        '[aria-label], [role="button"][aria-haspopup="menu"], button',
-      ),
-    ).filter((button) => {
+    const visibleButtons = Array.from(document.querySelectorAll<HTMLElement>('[aria-label]')).filter((button) => {
       if (!button.isConnected || button.getClientRects().length === 0) return false;
       const label = this.getAccessibleText(button).toLowerCase();
-      return (
-        label.includes('more') ||
-        label.includes('message action') ||
-        label === 'menu'
-      );
+      return label === 'more' || label === 'more options';
     });
 
     return visibleButtons.find((button) => {
@@ -410,16 +382,25 @@ export class LiveMessengerAdapter implements MessengerAdapter {
     const scrollContainer = this.findMessageScrollContainer(main);
     if (!scrollContainer) return;
 
+    scrollContainer.scrollTop = scrollContainer.scrollHeight;
+    await delayWithJitter(1200);
+
     let stablePasses = 0;
     let previousHeight = scrollContainer.scrollHeight;
     let previousCount = this.findAllElements(SELECTORS.messageItem).filter((element) =>
       main.contains(element),
     ).length;
 
-    for (let pass = 0; pass < 80 && stablePasses < 5; pass++) {
+    for (let pass = 0; pass < 120; pass++) {
       scrollContainer.scrollTop = 0;
       scrollContainer.dispatchEvent(new Event('scroll', { bubbles: true }));
-      await new Promise((resolve) => setTimeout(resolve, 900));
+
+      let loading = true;
+      for (let wait = 0; wait < 8; wait++) {
+        await delayWithJitter(700);
+        loading = Boolean(document.querySelector('[role="main"] svg[aria-valuetext="Loading..."]'));
+        if (!loading) break;
+      }
 
       const nextHeight = scrollContainer.scrollHeight;
       const nextCount = this.findAllElements(SELECTORS.messageItem).filter((element) =>
@@ -429,20 +410,46 @@ export class LiveMessengerAdapter implements MessengerAdapter {
       stablePasses = changed ? 0 : stablePasses + 1;
       previousHeight = nextHeight;
       previousCount = nextCount;
+      if (stablePasses >= 5 && !loading) break;
     }
   }
 
   private findMessageScrollContainer(main: Element): HTMLElement | null {
-    const candidates = [main, ...Array.from(main.querySelectorAll<HTMLElement>('*'))].filter(
-      (element): element is HTMLElement =>
-        element instanceof HTMLElement &&
-        element.scrollHeight > element.clientHeight + 80 &&
-        getComputedStyle(element).overflowY !== 'hidden',
-    );
+    const grid = main.querySelector('[role="grid"]') || document.querySelector('[role="grid"]');
+    if (grid) {
+      let current = grid.firstElementChild;
+      while (current) {
+        if (current instanceof HTMLElement) {
+          const overflow = getComputedStyle(current).overflowY;
+          if (
+            (overflow === 'auto' || overflow === 'scroll') &&
+            current.scrollHeight > current.clientHeight
+          ) {
+            return current;
+          }
+        }
+        current = current.firstElementChild;
+      }
+    }
 
-    return candidates.sort(
-      (a, b) =>
-        b.scrollHeight - b.clientHeight - (a.scrollHeight - a.clientHeight),
-    )[0] || null;
+    const row = this.findFirstElement(SELECTORS.messageItem);
+    let current: Element | null = row;
+    while (current) {
+      if (current instanceof HTMLElement) {
+        const overflow = getComputedStyle(current).overflowY;
+        if (
+          (overflow === 'auto' || overflow === 'scroll') &&
+          current.scrollHeight > current.clientHeight
+        ) {
+          return current;
+        }
+      }
+      current = current.parentElement;
+    }
+    return null;
+  }
+
+  private dismissOpenMenu(): void {
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
   }
 }
