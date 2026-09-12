@@ -170,6 +170,13 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
         <div className="cs-settings__label-desc">2. Confirm you are there</div>
         <div className="cs-settings__label-desc">3. Load every visible item</div>
         <div className="cs-settings__label-desc">4. Review before cleanup</div>
+        <div
+          className="cs-settings__label-desc"
+          style={{ marginTop: 'var(--cs-space-sm)', color: 'var(--cs-warning-400)' }}
+        >
+          Facebook may need two clicks on “Open correct page” before the specific category
+          finishes loading. If the first click opens the general Activity Log, click it again.
+        </div>
       </div>
 
       <div className="cs-card" style={{ padding: 'var(--cs-space-md)', marginBottom: 'var(--cs-space-md)' }}>
