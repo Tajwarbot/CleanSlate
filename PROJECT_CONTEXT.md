@@ -123,10 +123,14 @@ npm start
 ```
 
 - **Popup → SW**: `START_SCAN`, `DETECT_CAPABILITIES`, `START_OPERATION`, etc.
-- **SW → Content**: `SCAN_REQUEST`, `DETECT_CAPABILITIES`, `EXECUTE_ITEM`, `VERIFY_ITEM`
+- **SW → Content**: `SCAN_REQUEST`, `DETECT_CAPABILITIES`, `EXECUTE_ITEM`, `VERIFY_ITEM`, `BULK_CLEANUP`
 - **Content → SW**: Returns `{ status, items }` or `{ status, result }`
 
 All messages are validated via `src/utils/validation.ts` using typed `ExtensionMessage` unions. Content scripts cannot issue operation commands (enforced by authorization checks).
+
+### Persistent Scan Progress
+
+Activity Log scans write progress to `chrome.storage.local` under `cleanslate_scan_progress`. The record contains the current phase, detail text, loaded-item count, category, discovered items when complete, status, and `updatedAt`. The popup reads and polls this record so closing and reopening the popup does not hide an active scan or discard completed results.
 
 ---
 
@@ -139,8 +143,9 @@ All messages are validated via `src/utils/validation.ts` using typed `ExtensionM
 5. **Stable Hook References (`useExtension`)**: The popup `useExtension` hook returns an object of callbacks. It must be wrapped in `useMemo` and the initial load effect in `App.tsx` must only run on mount (`[]`), otherwise React enters an infinite re-render loop blasting Chrome runtime messaging and locking the UI thread.
 6. **Active Operation Coordination**: The service worker coordinates the async execution loop (`handleStartOperation` / `runExecutionLoop`) and broadcasts `OPERATION_PROGRESS` and `OPERATION_COMPLETE` messages to the popup to keep the progress UI reactive.
 7. **Facebook Activity Log URLs & Discovery**: Never use `/your_information/activity_log` (Facebook displays 'Sorry, something went wrong'). Use the general `https://www.facebook.com/me/allactivity` route with category parameters: `LIKEDPOSTS` for likes and reactions, `COMMENTSCLUSTER` for comments, and `MANAGEPOSTSPHOTOSANDVIDEOS` for posts. Facebook may rewrite this route to `/profile.php?...&sk=allactivity`; validation must accept both forms. Items are discovered through language-agnostic 3-dots action buttons, checkboxes, and row containers rather than static feed selectors.
-8. **Automatic Likes & Reactions Workflow**: The guided flow opens the general Activity Log URL with `activity_history=false`, `manage_mode=false`, `should_load_landing_page=false`, and the selected category key. The user confirms the destination before CleanSlate waits for lazy-loaded entries, scans the page, and proceeds to review.
-9. **Automation Guardrails**: Activity Log automation is opt-in through the `cleanslate_action=reactions_cleanup` URL parameter, runs once per matching page/mode using `sessionStorage`, checks visible accessible controls, and stops with a warning if the select-all or remove control cannot be confidently located.
+8. **Account-Specific Activity Log Workflow**: The guided flow requests the active profile ID from the Facebook content script and builds `/{profile-id}/allactivity` URLs with `activity_history=false`, `manage_mode=false`, `should_load_landing_page=false`, and the selected category key. This avoids Facebook treating `/me/allactivity` as the default latest-activity page. Because Facebook can rewrite the route, validation accepts both numeric profile paths and `/profile.php?...&sk=allactivity`; the rendered category UI remains the final category check.
+9. **Lazy Loading and Native Bulk Removal**: Facebook Activity Log entries are lazy-loaded, so the content script scrolls the document and relevant inner scroll containers until loading stabilizes, writing progress after each pass. Facebook categories use the page's native `All`, `Remove`, and confirmation controls for bulk cleanup. Dry Run may select visible activity but never clicks `Remove`; Messenger conversations continue using the per-item adapter flow.
+10. **Automation Guardrails**: Activity Log automation is opt-in through the `cleanslate_action=reactions_cleanup` URL parameter, runs once per matching page/mode using `sessionStorage`, checks visible accessible controls, and stops with a warning if the select-all, remove, or confirmation control cannot be confidently located.
 
 ---
 
