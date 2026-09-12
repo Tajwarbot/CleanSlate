@@ -330,6 +330,58 @@ async function handleStartOperation(
 
     sendResponse({ acknowledged: true });
 
+    if (message.category !== 'conversations') {
+      try {
+        const result = (await chrome.tabs.sendMessage(tabId, {
+          type: 'BULK_CLEANUP',
+          category: message.category,
+          dryRun: message.dryRun,
+        })) as { status?: string };
+        const successful = result?.status === 'success';
+        activeOperation.stats = {
+          ...activeOperation.stats,
+          processedItems: total,
+          successCount: successful ? total : 0,
+          failedCount: successful ? 0 : total,
+          elapsedMs: Date.now() - startTime,
+        };
+        chrome.runtime
+          .sendMessage({
+            type: MessageType.OperationProgress,
+            source: MessageSource.ServiceWorker,
+            timestamp: Date.now(),
+            id: generateMessageId(),
+            stats: { ...activeOperation.stats },
+          })
+          .catch(() => {});
+        chrome.runtime
+          .sendMessage({
+            type: MessageType.OperationComplete,
+            source: MessageSource.ServiceWorker,
+            timestamp: Date.now(),
+            id: generateMessageId(),
+            report: {
+              operationId: message.operationId,
+              category: message.category,
+              stats: { ...activeOperation.stats },
+              results: [],
+              verifications: [],
+              startedAt: startTime,
+              completedAt: Date.now(),
+              durationMs: Date.now() - startTime,
+              stoppedByUser: false,
+              stoppedBySafety: !successful,
+              dryRun: message.dryRun,
+            },
+          })
+          .catch(() => {});
+        activeOperation = null;
+        return;
+      } catch {
+        // Fall through to the existing per-item executor for non-bulk pages.
+      }
+    }
+
     void runExecutionLoop();
   } catch (err) {
     sendResponse({ error: err instanceof Error ? err.message : 'Failed to start operation' });

@@ -168,6 +168,18 @@ body {
   opacity: 1;
 }
 
+@keyframes cs-progress-indeterminate {
+  from { transform: translateX(-100%); }
+  to { transform: translateX(100%); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    transition-duration: 0.001ms !important;
+  }
+}
+
 /* ---- Screen Reader Only ---- */
 .cs-sr-only {
   position: absolute;

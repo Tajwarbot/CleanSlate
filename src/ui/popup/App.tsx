@@ -13,6 +13,7 @@ import { DashboardPage } from './pages/DashboardPage';
 import { ActivitySelectPage } from './pages/ActivitySelectPage';
 import { MessengerSelectPage } from './pages/MessengerSelectPage';
 import { GuidedCleanupPage } from './pages/GuidedCleanupPage';
+import { ScanProgressPage } from './pages/ScanProgressPage';
 import { ScanResultsPage } from './pages/ScanResultsPage';
 import { ConfirmPage } from './pages/ConfirmPage';
 import { ProgressPage } from './pages/ProgressPage';
@@ -36,6 +37,7 @@ type Page =
   | 'activity_select'
   | 'messenger_select'
   | 'guided_cleanup'
+  | 'scan_progress'
   | 'scan_results'
   | 'confirm'
   | 'progress'
@@ -66,6 +68,11 @@ interface AppState {
   } | null;
   lastCleanupCount: number | null;
   stoppedByUser: boolean;
+  scanProgress: {
+    phase: string;
+    detail: string;
+    loadedItems: number;
+  };
 }
 
 const initialState: AppState = {
@@ -84,6 +91,11 @@ const initialState: AppState = {
   interruptedSession: null,
   lastCleanupCount: null,
   stoppedByUser: false,
+  scanProgress: {
+    phase: 'Preparing',
+    detail: 'Waiting to start.',
+    loadedItems: 0,
+  },
 };
 
 // ---- Actions ----
@@ -104,6 +116,7 @@ type AppAction =
   | { type: 'SET_INTERRUPTED_SESSION'; session: AppState['interruptedSession'] }
   | { type: 'SET_LAST_CLEANUP_COUNT'; count: number }
   | { type: 'SET_STOPPED_BY_USER'; stopped: boolean }
+  | { type: 'SET_SCAN_PROGRESS'; progress: AppState['scanProgress'] }
   | { type: 'RESET' };
 
 function reducer(state: AppState, action: AppAction): AppState {
@@ -143,6 +156,8 @@ function reducer(state: AppState, action: AppAction): AppState {
       return { ...state, lastCleanupCount: action.count };
     case 'SET_STOPPED_BY_USER':
       return { ...state, stoppedByUser: action.stopped };
+    case 'SET_SCAN_PROGRESS':
+      return { ...state, scanProgress: action.progress, page: 'scan_progress' };
     case 'RESET':
       return {
         ...initialState,
@@ -251,6 +266,34 @@ export function App() {
           dispatch({ type: 'SET_GUIDED_CATEGORY', category: pendingCategory });
         }
 
+        const scan = await chrome.storage.local.get('cleanslate_scan_progress');
+        const scanProgress = scan['cleanslate_scan_progress'] as {
+          status?: string;
+          phase?: string;
+          detail?: string;
+          loadedItems?: number;
+          items?: CleanupItem[];
+          category?: ActivityCategory;
+        } | undefined;
+        if (scanProgress?.status === 'scanning') {
+          if (scanProgress.category) {
+            dispatch({ type: 'SET_CATEGORY', category: scanProgress.category });
+          }
+          dispatch({
+            type: 'SET_SCAN_PROGRESS',
+            progress: {
+              phase: scanProgress.phase || 'Loading activity',
+              detail: scanProgress.detail || 'Loading activity in the Facebook tab.',
+              loadedItems: scanProgress.loadedItems || 0,
+            },
+          });
+        } else if (scanProgress?.status === 'complete' && scanProgress.items && scanProgress.category) {
+          dispatch({ type: 'SET_CATEGORY', category: scanProgress.category });
+          dispatch({ type: 'SET_DISCOVERED_ITEMS', items: scanProgress.items });
+          dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.PreviewReady });
+          dispatch({ type: 'SET_PAGE', page: 'scan_results' });
+        }
+
         // Detect platform
         try {
           const capResp = await ext.detectCapabilities();
@@ -283,6 +326,48 @@ export function App() {
     return () => mediaQuery.removeEventListener('change', applyTheme);
   }, [state.settings.theme]);
 
+  useEffect(() => {
+    if (state.page !== 'scan_progress') return;
+
+    let cancelled = false;
+    const poll = async () => {
+      const result = await chrome.storage.local.get('cleanslate_scan_progress');
+      const progress = result['cleanslate_scan_progress'] as {
+        status?: string;
+        phase?: string;
+        detail?: string;
+        loadedItems?: number;
+        items?: CleanupItem[];
+        category?: ActivityCategory;
+      } | undefined;
+      if (cancelled || !progress) return;
+
+      if (progress.status === 'complete' && progress.items && progress.category) {
+        dispatch({ type: 'SET_CATEGORY', category: progress.category });
+        dispatch({ type: 'SET_DISCOVERED_ITEMS', items: progress.items });
+        dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.PreviewReady });
+        dispatch({ type: 'SET_PAGE', page: 'scan_results' });
+        return;
+      }
+
+      dispatch({
+        type: 'SET_SCAN_PROGRESS',
+        progress: {
+          phase: progress.phase || 'Loading activity',
+          detail: progress.detail || 'Loading activity in the active tab.',
+          loadedItems: progress.loadedItems || 0,
+        },
+      });
+    };
+
+    void poll();
+    const timer = window.setInterval(() => void poll(), 700);
+    return () => {
+      cancelled = true;
+      window.clearInterval(timer);
+    };
+  }, [state.page]);
+
   // ---- Event handlers ----
 
   const goToDashboard = useCallback(() => {
@@ -303,6 +388,24 @@ export function App() {
       dispatch({ type: 'SET_CATEGORY', category });
       await chrome.storage.local.remove('cleanslate_guided_category');
       dispatch({ type: 'SET_OPERATION_STATE', state: OperationState.Scanning });
+      await chrome.storage.local.set({
+        cleanslate_scan_progress: {
+          status: 'scanning',
+          phase: 'Connecting to page',
+          detail: 'Checking the active Facebook or Messenger tab.',
+          loadedItems: 0,
+          category,
+          updatedAt: Date.now(),
+        },
+      });
+      dispatch({
+        type: 'SET_SCAN_PROGRESS',
+        progress: {
+          phase: 'Connecting to page',
+          detail: 'Checking the active Facebook or Messenger tab.',
+          loadedItems: 0,
+        },
+      });
 
       try {
         const result = (await ext.startScan(category, state.dryRun)) as {
@@ -456,6 +559,14 @@ export function App() {
             category={state.category}
             onStart={handleScan}
             onCancel={goToDashboard}
+          />
+        )}
+
+        {state.page === 'scan_progress' && (
+          <ScanProgressPage
+            phase={state.scanProgress.phase}
+            detail={state.scanProgress.detail}
+            loadedItems={state.scanProgress.loadedItems}
           />
         )}
 

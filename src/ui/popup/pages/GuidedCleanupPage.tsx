@@ -83,16 +83,33 @@ function getDestination(category: ActivityCategory, profileId: string | null): {
 export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanupPageProps) {
   const [currentUrl, setCurrentUrl] = useState('');
   const [message, setMessage] = useState('');
-  const profileId = getFacebookProfileId(currentUrl);
+  const profileId = getFacebookProfileId(currentUrl) ||
+    currentUrl.match(/cleanslate-profile=(\d+)/)?.[1] ||
+    null;
   const destination = useMemo(
     () => getDestination(category, profileId),
     [category, profileId],
   );
 
-  const refreshPageCheck = () => {
-    chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
-      setCurrentUrl(tabs[0]?.url || '');
-    });
+  const refreshPageCheck = async () => {
+    const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
+    const activeTab = tabs[0];
+    let nextUrl = activeTab?.url || '';
+    if (activeTab?.id && nextUrl.includes('facebook.com')) {
+      try {
+        const context = await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'GET_PROFILE_CONTEXT',
+        }) as { profileId?: string; url?: string };
+        if (context.url) nextUrl = context.url;
+        if (context.profileId && category !== MessengerCategory.Conversations) {
+          setCurrentUrl(`${nextUrl}#cleanslate-profile=${context.profileId}`);
+          return;
+        }
+      } catch {
+        // Use the tab URL when the content script is unavailable.
+      }
+    }
+    setCurrentUrl(nextUrl);
   };
 
   useEffect(() => {
@@ -104,7 +121,21 @@ export function GuidedCleanupPage({ category, onStart, onCancel }: GuidedCleanup
   const openDestination = async () => {
     const tabs = await chrome.tabs.query({ active: true, currentWindow: true });
     const activeTab = tabs[0];
-    const targetProfileId = getFacebookProfileId(activeTab?.url || '') || profileId;
+    let targetProfileId = getFacebookProfileId(activeTab?.url || '') || profileId;
+    if (
+      activeTab?.id &&
+      activeTab.url?.includes('facebook.com') &&
+      category !== MessengerCategory.Conversations
+    ) {
+      try {
+        const context = await chrome.tabs.sendMessage(activeTab.id, {
+          type: 'GET_PROFILE_CONTEXT',
+        }) as { profileId?: string };
+        targetProfileId = context.profileId || targetProfileId;
+      } catch {
+        // Fall back to the profile ID already visible in the tab URL.
+      }
+    }
     const targetUrl =
       category === MessengerCategory.Conversations
         ? destination.url

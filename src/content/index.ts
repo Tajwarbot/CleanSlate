@@ -31,6 +31,21 @@ function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
   return 'unknown';
 }
 
+function getProfileIdFromPage(): string | null {
+  const currentUrl = new URL(window.location.href);
+  const queryId = currentUrl.searchParams.get('id');
+  if (queryId && /^\d+$/.test(queryId)) return queryId;
+
+  const pathMatch = currentUrl.pathname.match(/^\/(\d+)(?:\/|$)/);
+  if (pathMatch?.[1]) return pathMatch[1];
+
+  const profileLink = Array.from(document.querySelectorAll<HTMLAnchorElement>('a[href]'))
+    .map((link) => link.href)
+    .find((href) => /facebook\.com\/(?:profile\.php\?id=)?\d+/.test(href));
+  const linkMatch = profileLink?.match(/(?:profile\.php\?id=|facebook\.com\/)(\d+)/);
+  return linkMatch?.[1] || null;
+}
+
 function isVisible(element: Element): element is HTMLElement {
   const htmlElement = element as HTMLElement;
   return Boolean(htmlElement.isConnected && htmlElement.getClientRects().length > 0);
@@ -93,12 +108,30 @@ async function getStoredNavigation(): Promise<{
 }
 
 async function waitForActivityItemsToLoad(): Promise<void> {
+  const writeProgress = async (phase: string, detail: string, loadedItems = 0) => {
+    await chrome.storage.local.set({
+      cleanslate_scan_progress: {
+        status: 'scanning',
+        phase,
+        detail,
+        loadedItems,
+        updatedAt: Date.now(),
+      },
+    });
+  };
+
+  await writeProgress('Preparing Facebook', 'Waiting for the Activity Log controls to render.');
   await new Promise((resolve) => setTimeout(resolve, AUTOMATION_SETTLE_DELAY_MS));
 
   let stableScrollHeightCount = 0;
   let previousScrollHeight = 0;
 
   for (let i = 0; i < AUTOMATION_MAX_SCROLLS && stableScrollHeightCount < 3; i++) {
+    await writeProgress(
+      'Loading more activity',
+      `Scrolling through Facebook activity (${i + 1}/${AUTOMATION_MAX_SCROLLS}).`,
+      document.querySelectorAll('[role="row"], [role="article"]').length,
+    );
     window.scrollTo({ top: document.documentElement.scrollHeight, behavior: 'smooth' });
     const scrollableContainers = Array.from(
       document.querySelectorAll<HTMLElement>('div, main, section'),
@@ -133,6 +166,11 @@ async function waitForActivityItemsToLoad(): Promise<void> {
   }
 
   window.scrollTo({ top: 0, behavior: 'smooth' });
+  await writeProgress(
+    'Reading loaded activity',
+    'The page is loaded. Building a reviewable activity list.',
+    document.querySelectorAll('[role="row"], [role="article"]').length,
+  );
 }
 
 function findSelectAllCheckbox(): HTMLElement | null {
@@ -170,6 +208,52 @@ function findRemoveAllButton(): HTMLElement | null {
       );
     }) as HTMLElement | undefined
   ) || null;
+}
+
+async function runFacebookBulkCleanup(
+  category: ActivityCategory,
+  dryRun: boolean,
+): Promise<{ status: 'success' | 'failed'; message?: string }> {
+  await selectRenderedCategory(category);
+  await waitForActivityItemsToLoad();
+
+  const selectAll = await waitForControl(findSelectAllCheckbox);
+  if (!selectAll) {
+    return { status: 'failed', message: 'Facebook All selector was not found' };
+  }
+
+  if (
+    selectAll.getAttribute('aria-checked') !== 'true' &&
+    !(selectAll as HTMLInputElement).checked
+  ) {
+    selectAll.click();
+    await new Promise((resolve) => setTimeout(resolve, 600));
+  }
+
+  if (dryRun) {
+    return { status: 'success', message: 'Dry run selected all visible Facebook activity' };
+  }
+
+  const removeButton = await waitForControl(findRemoveAllButton);
+  if (!removeButton) {
+    return { status: 'failed', message: 'Facebook Remove button was not found' };
+  }
+
+  removeButton.click();
+  await new Promise((resolve) => setTimeout(resolve, 800));
+
+  const confirmation = await waitForControl(() => {
+    const buttons = Array.from(
+      document.querySelectorAll<HTMLElement>('[role="dialog"] [role="button"], [role="dialog"] button'),
+    );
+    return buttons.find((button) => {
+      const text = getElementText(button);
+      return text.includes('remove') || text.includes('delete') || text.includes('confirm');
+    }) || null;
+  });
+  confirmation?.click();
+
+  return { status: 'success' };
 }
 
 function categorySearchTerms(category: ActivityCategory): string[] {
@@ -316,6 +400,9 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
   const platform = detectPlatform();
 
   switch (msg['type']) {
+    case 'GET_PROFILE_CONTEXT':
+      return { profileId: getProfileIdFromPage(), url: window.location.href };
+
     case 'DETECT_CAPABILITIES': {
       const caps =
         platform === 'messenger'
@@ -342,10 +429,29 @@ async function handleMessageAsync(msg: Record<string, unknown>): Promise<unknown
         items = await fbAdapter.scanActivity(category);
       }
 
+      await chrome.storage.local.set({
+        cleanslate_scan_progress: {
+          status: 'complete',
+          phase: 'Scan complete',
+          detail: 'Activity is ready for review.',
+          loadedItems: items.length,
+          items,
+          category,
+          updatedAt: Date.now(),
+        },
+      });
+
       return {
         status: 'success',
         items: [...items],
       };
+    }
+
+    case 'BULK_CLEANUP': {
+      const category = (msg['category'] as ActivityCategory) || FacebookCategory.Comments;
+      const dryRun = msg['dryRun'] === true;
+      const result = await runFacebookBulkCleanup(category, dryRun);
+      return result;
     }
 
     case 'EXECUTE_ITEM': {
