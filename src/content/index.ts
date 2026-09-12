@@ -20,6 +20,8 @@ const msgerAdapter = new LiveMessengerAdapter();
 const AUTOMATION_SETTLE_DELAY_MS = 1200;
 const AUTOMATION_SCROLL_DELAY_MS = 700;
 const AUTOMATION_MAX_SCROLLS = 40;
+const AUTOMATION_WAIT_TIMEOUT_MS = 30000;
+const AUTOMATION_POLL_INTERVAL_MS = 500;
 
 /** Determine which platform we're on */
 function detectPlatform(): 'facebook' | 'messenger' | 'unknown' {
@@ -39,6 +41,43 @@ function getElementText(element: Element): string {
     .replace(/\s+/g, ' ')
     .trim()
     .toLowerCase();
+}
+
+function getAutomationParameter(name: string): string | null {
+  const url = new URL(window.location.href);
+  const hash = url.hash.startsWith('#') ? url.hash.slice(1) : url.hash;
+  const hashParams = new URLSearchParams(hash);
+  return url.searchParams.get(name) || hashParams.get(name);
+}
+
+function isReactionsAutomationTarget(): boolean {
+  const url = new URL(window.location.href);
+  return (
+    (url.pathname === '/me/allactivity' || url.pathname === '/me/allactivity/') &&
+    url.searchParams.get('category_key')?.toUpperCase() === 'LIKESANDREACTIONSCLUSTER' &&
+    getAutomationParameter('cleanslate_action') === 'reactions_cleanup'
+  );
+}
+
+async function waitForAutomationTarget(): Promise<boolean> {
+  const deadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    if (isReactionsAutomationTarget()) return true;
+    await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
+  }
+  return false;
+}
+
+async function waitForControl(
+  findControl: () => HTMLElement | null,
+): Promise<HTMLElement | null> {
+  const deadline = Date.now() + AUTOMATION_WAIT_TIMEOUT_MS;
+  while (Date.now() < deadline) {
+    const control = findControl();
+    if (control) return control;
+    await new Promise((resolve) => setTimeout(resolve, AUTOMATION_POLL_INTERVAL_MS));
+  }
+  return null;
 }
 
 async function waitForActivityItemsToLoad(): Promise<void> {
@@ -94,42 +133,38 @@ function findRemoveAllButton(): HTMLElement | null {
 async function runAutomaticReactionsCleanup(): Promise<void> {
   if (detectPlatform() !== 'facebook') return;
 
-  const url = new URL(window.location.href);
-  if (
-    url.pathname !== '/me/allactivity' ||
-    url.searchParams.get('category_key') !== 'LIKESANDREACTIONSCLUSTER' ||
-    url.searchParams.get('cleanslate_action') !== 'reactions_cleanup'
-  ) {
+  if (!(await waitForAutomationTarget())) {
     return;
   }
 
-  const runKey = `cleanslate:${url.searchParams.get('cleanslate_mode') || 'preview'}`;
+  const mode = getAutomationParameter('cleanslate_mode') || 'preview';
+  const runKey = `cleanslate:reactions_cleanup:${mode}`;
   if (sessionStorage.getItem(runKey) === window.location.href) return;
-  sessionStorage.setItem(runKey, window.location.href);
 
   logger.info('Starting automatic Likes & Reactions Activity Log workflow', {
-    context: { mode: url.searchParams.get('cleanslate_mode') || 'preview' },
+    context: { mode },
   });
 
   await waitForActivityItemsToLoad();
 
-  const selectAll = findSelectAllCheckbox();
+  const selectAll = await waitForControl(findSelectAllCheckbox);
   if (!selectAll) {
     logger.warn('Automatic cleanup stopped: Activity Log select-all control was not found');
     return;
   }
+  sessionStorage.setItem(runKey, window.location.href);
 
   if (selectAll.getAttribute('aria-checked') !== 'true' && !(selectAll as HTMLInputElement).checked) {
     selectAll.click();
     await new Promise((resolve) => setTimeout(resolve, 500));
   }
 
-  if (url.searchParams.get('cleanslate_mode') === 'preview') {
+  if (mode !== 'execute') {
     logger.info('Automatic cleanup preview complete; Remove was not clicked');
     return;
   }
 
-  const removeAll = findRemoveAllButton();
+  const removeAll = await waitForControl(findRemoveAllButton);
   if (!removeAll) {
     logger.warn('Automatic cleanup stopped: Activity Log remove control was not found');
     return;

@@ -266,8 +266,10 @@ export function App() {
   const openFacebookActivityLog = useCallback(() => {
     const targetUrl = new URL('https://www.facebook.com/me/allactivity');
     targetUrl.searchParams.set('category_key', 'LIKESANDREACTIONSCLUSTER');
+    const mode = state.dryRun ? 'preview' : 'execute';
     targetUrl.searchParams.set('cleanslate_action', 'reactions_cleanup');
-    targetUrl.searchParams.set('cleanslate_mode', state.dryRun ? 'preview' : 'execute');
+    targetUrl.searchParams.set('cleanslate_mode', mode);
+    targetUrl.hash = `cleanslate_action=reactions_cleanup&cleanslate_mode=${mode}`;
 
     if (typeof chrome !== 'undefined' && chrome.tabs) {
       chrome.tabs.query({ active: true, currentWindow: true }, (tabs) => {
